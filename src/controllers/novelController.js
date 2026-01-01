@@ -1,8 +1,10 @@
 import Novel from '../models/Novel.js';
 import Chapter from '../models/Chapter.js';
-import { buildImagePrompt } from '../prompt/index.js';
 import fs from 'fs';
 import path from 'path';
+
+// --- 删除引用：import { buildImagePrompt } from '../prompt/index.js'; ---
+// 因为我们现在使用模板替换逻辑，不再需要这个函数
 
 // 1. 渲染小说列表页
 export const renderNovelList = async (ctx) => {
@@ -40,15 +42,21 @@ export const renderNovelDetail = async (ctx) => {
     });
 };
 
-// 4. 更新小说信息 (包含 prompts)
+// 4. 更新小说信息 (支持局部更新)
 export const updateNovel = async (ctx) => {
     const { id } = ctx.params;
-    const { title, author, status, description, cover, prompts } = ctx.request.body;
+    const body = ctx.request.body;
     
-    const updateData = { title, author, status, description, cover };
+    const updateData = {};
+
+    if (body.title !== undefined) updateData.title = body.title;
+    if (body.author !== undefined) updateData.author = body.author;
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.cover !== undefined) updateData.cover = body.cover;
     
-    if (prompts) {
-        updateData.prompts = prompts;
+    if (body.prompts) {
+        updateData.prompts = body.prompts;
     }
 
     await Novel.findByIdAndUpdate(id, updateData);
@@ -158,7 +166,6 @@ export const importScript = async (ctx) => {
                             displayContent += `* **环境细节：** ${p.environment_details}\n`;
                         }
 
-                        // 处理音频/台词
                         const audio = p.audio_elements || p.lines || [];
                         audio.forEach(a => {
                             const role = a.speaker || "声音";
@@ -166,23 +173,22 @@ export const importScript = async (ctx) => {
                             displayContent += `* **${role}：** ${text}\n`;
                         });
 
-                        displayContent += `\n`; // 每个 Panel 后空一行
+                        displayContent += `\n`; 
                     });
                 } 
-                // 兼容逻辑 (无 Panels)
+                // 兼容逻辑
                 else {
                     displayContent += `**Panel 1**\n`;
                     displayContent += `* **画面：** ${page.visual_description || page.visual || '-'}\n`;
                 }
 
-                // 推入数组
                 flatPanels.push({
                     id: String(pageNum),
-                    visual: displayContent,         // 前端显示用 + 复制到 Prompt 用
+                    visual: displayContent,         
                     env: "", 
                     composition: "Whole Page",
                     lines: [], 
-                    image_index: pIndex // 暂存原始索引，下面会修正为 +1
+                    image_index: pIndex // 暂存
                 });
             });
         }
@@ -226,7 +232,7 @@ export const importScript = async (ctx) => {
     }
 };
 
-// 10. 获取单卡片 Prompt (已修复：使用 image 字段 + 模板替换)
+// 10. 获取单卡片 Prompt (无 buildImagePrompt 依赖)
 export const getPanelPrompt = async (ctx) => {
     const { id, panelId } = ctx.params; 
     const chapter = await Chapter.findById(id);
@@ -240,24 +246,73 @@ export const getPanelPrompt = async (ctx) => {
         return;
     }
 
-    // 1. 获取卡片 Markdown 内容 (**P1**...)
     const cardContent = panel.visual || "";
-
-    // 2. 获取模板 (修正为 novel.prompts.image)
-    // 这是给 LLM 看的模板，例如: "请根据以下脚本生成 SD 提示词：\n{content}"
     const template = (novel.prompts && novel.prompts.image) ? novel.prompts.image : "";
 
-    // 3. 拼接/替换
     let finalOutput = cardContent;
-
     if (template) {
         if (template.includes("{content}")) {
             finalOutput = template.replace(/{content}/g, cardContent);
         } else {
-            // 兜底：如果模板没写 {content}，直接接在后面
             finalOutput = template + "\n\n" + cardContent;
         }
     }
 
     ctx.body = { success: true, data: finalOutput };
+};
+
+// [新增] 保存视觉设定文本 (AJAX调用)
+export const saveVisualSettingText = async (ctx) => {
+    const { id } = ctx.params;
+    const { text } = ctx.request.body;
+
+    try {
+        await Chapter.findByIdAndUpdate(id, {
+            visual_setting_text: text
+        });
+        ctx.body = { success: true };
+    } catch (err) {
+        console.error(err);
+        ctx.status = 500;
+        ctx.body = { success: false, message: "保存失败" };
+    }
+};
+
+// [新增] 上传/保存视觉设定图 (style.png)
+export const uploadStyleImage = async (ctx) => {
+    const { id } = ctx.params;
+    const { image } = ctx.request.body; // Base64 字符串
+
+    if (!image) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: "未接收到图片数据" };
+        return;
+    }
+
+    try {
+        const chapter = await Chapter.findById(id);
+        const novelIdStr = chapter.novelId.toString();
+        const epFolder = `ep${chapter.order}`; 
+        const targetDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr, epFolder);
+
+        // 确保目录存在
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        // 处理 Base64 (去掉 data:image/png;base64, 前缀)
+        const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+        const dataBuffer = Buffer.from(base64Data, 'base64');
+
+        // 写入 style.png
+        const filePath = path.join(targetDir, 'style.png');
+        fs.writeFileSync(filePath, dataBuffer);
+
+        ctx.body = { success: true, message: "风格图保存成功" };
+
+    } catch (err) {
+        console.error(err);
+        ctx.status = 500;
+        ctx.body = { success: false, message: "保存失败: " + err.message };
+    }
 };

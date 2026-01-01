@@ -1,31 +1,26 @@
 import Router from 'koa-router';
-import { 
-    renderNovelList, 
-    createNovel, 
-    renderNovelDetail, 
-    updateNovel, 
-    createChapter,
-    updateChapter,
-    deleteChapter, // <--- 引入
-    renderChapterDetail,
-    importScript,
-    getPanelPrompt
-} from '../controllers/novelController.js';
+import * as novelController from '../controllers/novelController.js';
 
 const router = new Router();
 
-// --- 小说相关路由 ---
-router.get('/', renderNovelList);                  
-router.post('/novel/create', createNovel);         
-router.get('/novel/:id', renderNovelDetail);       
-router.post('/novel/:id/update', updateNovel);     
+// [修复] 首页路由 (核心缺失)
+router.get('/', novelController.renderNovelList);
 
-// --- 章节相关路由 ---
-router.post('/chapter/create', createChapter);     
-router.post('/chapter/:id/update', updateChapter); 
-router.post('/chapter/:id/delete', deleteChapter); // [新增] 删除章节
-router.get('/chapter/:id', renderChapterDetail);   
-router.post('/chapter/:id/import', importScript);  
-router.get('/chapter/:id/panel/:panelId/prompt', getPanelPrompt); 
+// 小说相关
+router.get('/novel/:id', novelController.renderNovelDetail);
+router.post('/novel/create', novelController.createNovel);
+router.post('/novel/:id/update', novelController.updateNovel);
+
+// 章节相关
+router.get('/chapter/:id', novelController.renderChapterDetail);
+router.post('/chapter/create', novelController.createChapter);
+router.post('/chapter/:id/update', novelController.updateChapter);
+router.post('/chapter/:id/delete', novelController.deleteChapter);
+router.post('/chapter/:id/import', novelController.importScript);
+router.get('/chapter/:id/panel/:panelId/prompt', novelController.getPanelPrompt);
+
+// 视觉设定相关
+router.post('/chapter/:id/save_setting_text', novelController.saveVisualSettingText);
+router.post('/chapter/:id/upload_style', novelController.uploadStyleImage);
 
 export default router;

@@ -1,249 +1,366 @@
 <%- include('partials/header') %>
 
-<div class="flex flex-col h-[calc(100vh-64px-32px)]" 
-     x-data="{ 
-        activeTab: new URLSearchParams(window.location.search).get('tab') || 'text',
-        panels: <%= JSON.stringify(chapter.script_data || []) %>
-     }"> 
+<div class="flex flex-col h-[calc(100vh-64px)] bg-slate-50" 
+     x-data="chapterDetail()"> 
     
-    <div class="flex items-center justify-between mb-4 flex-shrink-0">
-        <div class="text-sm text-slate-500">
-            <span class="font-bold text-slate-800"><%= chapter.title %></span>
-            <span class="mx-2">|</span>
-            <span class="text-slate-400"><%= novel.title %></span>
-        </div>
-
-        <div class="bg-slate-200 p-1 rounded-lg flex text-sm font-medium">
-            <button @click="activeTab = 'text'" 
-                :class="{ 'bg-white text-slate-800 shadow-sm': activeTab === 'text', 'text-slate-500 hover:text-slate-700': activeTab !== 'text' }"
-                class="px-4 py-1.5 rounded-md transition-all flex items-center gap-2">
+    <div class="bg-white border-b border-slate-200 px-6 pt-4 flex-shrink-0 shadow-sm z-20 relative">
+        <div class="flex gap-1 overflow-x-auto no-scrollbar justify-center">
+            <button @click="switchTab('text')" 
+                :class="{ 'border-indigo-500 text-indigo-700 bg-indigo-50/50': activeTab === 'text', 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50': activeTab !== 'text' }"
+                class="px-6 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
                 <span>📝</span> 提示词生成
             </button>
-            <button @click="activeTab = 'cards'" 
-                :class="{ 'bg-white text-blue-600 shadow-sm': activeTab === 'cards', 'text-slate-500 hover:text-slate-700': activeTab !== 'cards' }"
-                class="px-4 py-1.5 rounded-md transition-all flex items-center gap-2">
-                <span>🎬</span> <span x-text="`分镜制作 (${panels.length})`"></span>
+            
+            <button @click="switchTab('setting')" 
+                :class="{ 'border-purple-500 text-purple-700 bg-purple-50/50': activeTab === 'setting', 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50': activeTab !== 'setting' }"
+                class="px-6 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+                <span>🎨</span> 视觉设定
+            </button>
+
+            <button @click="switchTab('cards')" 
+                :class="{ 'border-blue-500 text-blue-700 bg-blue-50/50': activeTab === 'cards', 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50': activeTab !== 'cards' }"
+                class="px-6 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+                <span>🎬</span> 分镜制作 <span class="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-xs ml-1" x-text="panels.length"></span>
+            </button>
+
+            <button @click="switchTab('audio')" 
+                :class="{ 'border-emerald-500 text-emerald-700 bg-emerald-50/50': activeTab === 'audio', 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50': activeTab !== 'audio' }"
+                class="px-6 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+                <span>🗣️</span> 语音字幕
+            </button>
+
+            <button @click="switchTab('video')" 
+                :class="{ 'border-rose-500 text-rose-700 bg-rose-50/50': activeTab === 'video', 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50': activeTab !== 'video' }"
+                class="px-6 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+                <span>🎥</span> 视频生成
             </button>
         </div>
-        <div class="w-24"></div> 
     </div>
 
-    <div class="flex-1 min-h-0 relative">
+    <div class="flex-1 relative overflow-hidden bg-slate-50 p-6">
         
-        <div x-show="activeTab === 'text'" class="absolute inset-0 grid grid-cols-2 gap-6">
-            <div class="flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+        <div x-show="activeTab === 'text'" class="absolute inset-6 grid grid-cols-2 gap-6 overflow-hidden" style="display: none;">
+            <div class="flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 h-full overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center flex-shrink-0">
                     <span class="text-sm font-bold text-slate-700">📜 小说原文</span>
                     <div class="flex gap-2">
                         <button onclick="generatePrompt('script')" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 transition shadow-sm flex items-center gap-1">
                             <span>🎬</span> 生成剧本Prompt
                         </button>
                         <button onclick="generatePrompt('visual')" class="px-3 py-1.5 bg-pink-600 text-white text-xs rounded hover:bg-pink-700 transition shadow-sm flex items-center gap-1">
-                            <span>🎨</span> 生成视觉Prompt
+                            <span>👁️</span> 生成视觉Prompt
                         </button>
                     </div>
                 </div>
                 <textarea id="sourceContent" class="flex-1 w-full p-4 resize-none outline-none text-sm text-slate-700 font-mono bg-white leading-relaxed" readonly><%= chapter.content %></textarea>
             </div>
             
-            <div class="flex flex-col bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden">
-                <div class="px-4 py-3 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
-                    <span class="text-sm font-bold text-slate-300">生成的提示词 (复制给大模型)</span>
-                    <button onclick="copyResult(this)" class="text-xs text-slate-300 hover:text-white border border-slate-600 px-2 py-1 rounded transition-all min-w-[60px] text-center">复制</button>
+            <div class="flex flex-col bg-slate-800 rounded-xl shadow-lg border border-slate-700 h-full overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center flex-shrink-0">
+                    <span class="text-sm font-bold text-slate-300">生成的提示词</span>
+                    <button onclick="copyResult(this, 'resultOutput')" class="text-xs text-slate-300 hover:text-white border border-slate-600 px-2 py-1 rounded transition-all min-w-[60px] text-center">复制</button>
                 </div>
-                <textarea id="resultOutput" class="flex-1 w-full p-4 resize-none outline-none text-xs text-green-400 font-mono bg-slate-800" placeholder="点击左侧按钮，根据配置的模板生成 Prompt..."></textarea>
+                <textarea id="resultOutput" class="flex-1 w-full p-4 resize-none outline-none text-xs text-green-400 font-mono bg-slate-800" placeholder="点击左侧按钮，AI 提示词将在这里生成..."></textarea>
             </div>
         </div>
 
-        <div x-show="activeTab === 'cards'" class="absolute inset-0 grid grid-cols-12 gap-6" style="display: none;">
+        <div x-show="activeTab === 'setting'" class="absolute inset-6 grid grid-cols-2 gap-6 overflow-hidden" style="display: none;">
             
-            <div class="col-span-4 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+            <div class="flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 h-full overflow-hidden" 
+                 x-data="{ isSaving: false }">
+                <div class="px-4 py-3 border-b border-slate-100 bg-purple-50/50 flex justify-between items-center flex-shrink-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-purple-900">🎨 视觉设定描述</span>
+                        <span x-show="isSaving" class="text-[10px] text-purple-400 bg-purple-100 px-1 rounded animate-pulse">保存中...</span>
+                    </div>
+                    <button onclick="generatePrompt('visual_setting')" class="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition shadow-sm flex items-center gap-1">
+                        <span>✨</span> 生成提示词
+                    </button>
+                </div>
+                
+                <textarea 
+                    id="settingInput"
+                    x-model="settingText"
+                    @input.debounce.1000ms="saveSettingText()"
+                    class="flex-1 w-full p-5 resize-none outline-none text-sm text-slate-700 font-mono bg-white leading-relaxed placeholder-slate-300" 
+                    placeholder="在此输入您构思的视觉设定（角色外貌、场景风格、画风要求等）..."></textarea>
+            </div>
+
+            <div class="flex flex-col gap-4 overflow-hidden h-full">
+                
+                <div class="h-2/5 flex flex-col bg-slate-800 rounded-xl shadow-md border border-slate-700 overflow-hidden flex-shrink-0">
+                    <div class="px-4 py-2 bg-slate-900/50 border-b border-slate-700 flex justify-between items-center flex-shrink-0">
+                        <span class="text-xs font-bold text-purple-300">🚀 最终提示词 (复制 -> 去大模型生图)</span>
+                        <button onclick="copyResult(this, 'settingOutput')" class="text-[10px] text-slate-300 border border-slate-600 px-2 py-0.5 rounded hover:text-white hover:bg-slate-700 transition">复制</button>
+                    </div>
+                    <textarea id="settingOutput" class="flex-1 w-full p-4 resize-none outline-none text-xs text-purple-200 font-mono bg-slate-800" placeholder="点击左侧 '生成提示词' 按钮..."></textarea>
+                </div>
+
+                <div class="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+                    <div class="px-4 py-2 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center flex-shrink-0 z-10">
+                        <span class="text-sm font-bold text-slate-700">🖼️ 风格图预览 (Style.png)</span>
+                        <label class="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition shadow-sm flex items-center gap-1 cursor-pointer">
+                            <span x-show="!isUploading">📤 上传图片</span>
+                            <span x-show="isUploading">⏳ 上传中...</span>
+                            <input type="file" class="hidden" accept="image/*" @change="uploadStyle($event)">
+                        </label>
+                    </div>
+                    
+                    <div class="flex-1 bg-slate-100 relative group flex items-center justify-center overflow-hidden p-4">
+                        <img :src="styleImage" 
+                             class="max-w-full max-h-full object-contain shadow-md rounded border border-slate-200"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                        <div class="absolute inset-0 flex-col items-center justify-center text-slate-400 hidden" style="display: none;">
+                            <span class="text-5xl mb-3 opacity-20">🖼️</span>
+                            <p class="text-sm font-medium">暂无风格图</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="activeTab === 'cards'" class="absolute inset-6 grid grid-cols-12 gap-6 overflow-hidden" style="display: none;">
+             
+             <div class="col-span-4 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 h-full overflow-hidden"
                  x-data="{ 
                      rawScript: localStorage.getItem('aimanga_script_cache_<%= chapter._id %>') || '',
                      saveCache() { localStorage.setItem('aimanga_script_cache_<%= chapter._id %>', this.rawScript) }
                  }">
-                <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <div class="px-4 py-3 border-b border-slate-100 bg-blue-50/30 flex justify-between items-center flex-shrink-0">
                     <span class="text-sm font-bold text-slate-700">📥 导入 JSON 脚本</span>
-                    <span class="text-[10px] text-slate-400" x-show="rawScript.length > 0">已自动缓存</span>
+                    <button @click="importScript()" 
+                        :disabled="isSubmitting"
+                        class="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition shadow-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span x-show="!isSubmitting">🚀 解析</span>
+                        <span x-show="isSubmitting">⏳ 解析中...</span>
+                    </button>
                 </div>
-                
-                <div class="flex-1 flex flex-col relative" x-data="{ isSubmitting: false, errorMsg: '' }">
-                    <div class="flex-1 relative">
-                        <textarea x-model="rawScript" @input="saveCache()" 
-                            placeholder='在此粘贴大模型生成的 JSON 代码...' 
-                            class="absolute inset-0 w-full h-full p-4 text-xs font-mono resize-none outline-none text-slate-600 bg-white border-0"></textarea>
-                    </div>
-                    
-                    <div x-show="errorMsg" x-transition class="px-4 py-2 bg-red-50 text-red-600 text-xs border-t border-red-100 flex items-center gap-2">
-                        <span>⚠️</span> <span x-text="errorMsg"></span>
-                    </div>
 
-                    <div class="p-4 border-t border-slate-100 bg-slate-50/30">
-                        <button @click="importScriptWithAjax($data, rawScript, $dispatch)" 
-                            :disabled="isSubmitting"
-                            :class="{'opacity-50 cursor-not-allowed': isSubmitting}"
-                            class="w-full py-2.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium shadow-sm transition flex items-center justify-center gap-2">
-                            <span x-show="!isSubmitting">🚀</span>
-                            <span x-show="isSubmitting" class="animate-spin">⏳</span>
-                            <span x-text="isSubmitting ? '解析中...' : '解析并生成卡片'"></span>
-                        </button>
-                    </div>
+                <div class="flex-1 flex flex-col relative">
+                     <textarea x-model="rawScript" @input="saveCache()" id="jsonInput" 
+                        class="absolute inset-0 w-full h-full p-4 text-xs font-mono resize-none outline-none text-slate-600 bg-white border-0" 
+                        placeholder="在此粘贴 LLM 生成的 JSON 分镜脚本..."></textarea>
+                     
+                     <div x-show="errorMsg" x-transition 
+                          class="absolute bottom-4 left-4 right-4 px-3 py-2 bg-red-100 text-red-700 text-xs rounded border border-red-200 shadow-sm flex items-center gap-2"
+                          style="display: none;">
+                        <span>⚠️</span> <span x-text="errorMsg"></span>
+                     </div>
                 </div>
             </div>
 
-            <div class="col-span-8 flex flex-col bg-slate-100/50 rounded-xl border border-slate-200 overflow-hidden">
-                <div class="px-4 py-3 border-b border-slate-200 bg-white flex justify-between items-center">
-                    <span class="text-sm font-bold text-slate-700">🎬 分镜预览 (<span x-text="panels.length"></span>)</span>
+            <div class="col-span-8 flex flex-col bg-slate-100/50 rounded-xl border border-slate-200 h-full overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-200 bg-white flex justify-between items-center flex-shrink-0">
+                    <span class="text-sm font-bold text-slate-700">🎬 分镜预览</span>
+                    <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full" x-text="'共 ' + panels.length + ' 页'"></span>
                 </div>
 
-                <div class="flex-1 overflow-y-auto p-4" @panels-updated.window="panels = $event.detail">
+                <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
                     
-                    <div x-show="panels.length > 0" class="space-y-4">
-                        <template x-for="(panel, index) in panels" :key="index">
-                            <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden group hover:border-blue-300 transition-colors">
-                                
-                                <div class="flex-1 p-4 flex flex-col gap-3">
-                                    <div class="flex justify-between items-start">
-                                        <div class="flex items-center gap-2">
-                                            <span class="bg-slate-800 text-white px-2 py-0.5 rounded text-xs font-mono font-bold" x-text="'PAGE ' + panel.id"></span>
-                                        </div>
-                                        
-                                        <button @click="copyPanelPrompt('<%= chapter._id %>', panel.id, $el)" 
-                                            class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 text-xs rounded-lg hover:bg-blue-600 hover:text-white transition-all font-medium border border-blue-100">
-                                            <span>🎨</span>
-                                            <span>复制生图词</span>
-                                        </button>
-                                    </div>
+                    <div x-show="panels.length === 0" class="h-full flex flex-col items-center justify-center text-slate-400">
+                        <div class="text-4xl mb-2 opacity-30">📭</div>
+                        <p class="text-sm">暂无分镜数据</p>
+                    </div>
 
-                                    <div class="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-lg border border-slate-100 font-mono whitespace-pre-wrap"
-                                         x-text="panel.visual || '-'">
-                                    </div>
+                    <template x-for="(panel, index) in panels" :key="index">
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden group hover:border-blue-400 transition-all mb-4">
+                            <div class="flex-1 p-5 flex flex-col gap-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="bg-slate-800 text-white px-2 py-0.5 rounded text-xs font-mono font-bold tracking-wide" x-text="'PAGE ' + panel.id"></span>
+                                    <button @click="copyPanelPrompt(panel.id, $el)" 
+                                        class="px-3 py-1.5 bg-blue-50 text-blue-600 text-xs font-medium rounded border border-blue-100 hover:bg-blue-600 hover:text-white transition-colors">
+                                        复制生图词
+                                    </button>
                                 </div>
-
-                                <div class="w-full md:w-48 bg-slate-100 border-l border-slate-100 relative group/img cursor-pointer"
-                                     @click="window.open(`/images/<%= novel._id %>/ep<%= chapter.order %>/${index + 1}.png`, '_blank')">
-                                    
-                                    <img :src="`/images/<%= novel._id %>/ep<%= chapter.order %>/${index + 1}.png`" 
-                                         onerror="this.style.display='none'"
-                                         class="absolute inset-0 w-full h-full object-cover z-10">
-                                    
-                                    <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-300">
-                                        <span class="text-2xl mb-2">🖼️</span>
-                                        <span class="text-[10px] font-mono">Image Preview</span>
-                                        <span class="text-[8px] font-mono mt-1" x-text="(index + 1) + '.png'"></span>
-                                    </div>
+                                <div class="text-sm text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-100 font-mono whitespace-pre-wrap leading-relaxed select-text" x-text="panel.visual"></div>
+                            </div>
+                            
+                            <div class="w-full md:w-56 bg-slate-100 relative cursor-pointer group/img border-l border-slate-100" 
+                                 @click="openImage(index)">
+                                <img :src="getImageUrl(index)" 
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
+                                     class="absolute inset-0 w-full h-full object-cover transition-transform group-hover/img:scale-105">
+                                
+                                <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-300 bg-slate-100 hidden" style="display: none;">
+                                    <span class="text-2xl mb-1">🖼️</span>
+                                    <span class="text-xs font-mono" x-text="(index + 1) + '.png'"></span>
                                 </div>
                             </div>
-                        </template>
-                    </div>
+                        </div>
+                    </template>
                 </div>
             </div>
-
         </div>
+        
+        <div x-show="activeTab === 'audio'" class="absolute inset-6 flex items-center justify-center bg-white border border-slate-200 rounded-xl border-dashed" style="display: none;">
+            <div class="text-center text-slate-400">
+                <div class="text-6xl mb-4 opacity-20">🗣️</div>
+                <h3 class="text-xl font-bold text-slate-600 mb-2">语音字幕制作</h3>
+                <p class="text-sm bg-slate-100 px-3 py-1 rounded-full inline-block">🚧 功能开发中...</p>
+            </div>
+        </div>
+
+        <div x-show="activeTab === 'video'" class="absolute inset-6 flex items-center justify-center bg-white border border-slate-200 rounded-xl border-dashed" style="display: none;">
+            <div class="text-center text-slate-400">
+                <div class="text-6xl mb-4 opacity-20">🎥</div>
+                <h3 class="text-xl font-bold text-slate-600 mb-2">视频生成</h3>
+                <p class="text-sm bg-slate-100 px-3 py-1 rounded-full inline-block">🚧 功能开发中...</p>
+            </div>
+        </div>
+
     </div>
 </div>
 
 <script src="//unpkg.com/alpinejs" defer></script>
+
 <script>
-    // AJAX 导入逻辑 (更新版)
-    async function importScriptWithAjax(alpineData, scriptContent, dispatch) {
-        if (!scriptContent.trim()) {
-            alpineData.errorMsg = "内容不能为空";
-            return;
+    window.CHAPTER_DATA = {
+        novelId: "<%= novel._id %>",
+        chapterId: "<%= chapter._id %>",
+        chapterOrder: "<%= chapter.order %>",
+        activeTab: new URLSearchParams(window.location.search).get('tab') || 'text',
+        panels: <%- JSON.stringify(chapter.script_data || []) %>,
+        settingText: <%- JSON.stringify(chapter.visual_setting_text || '') %>,
+        prompts: {
+            script: <%- JSON.stringify(novel.prompts && novel.prompts.script ? novel.prompts.script : "") %>,
+            visual: <%- JSON.stringify(novel.prompts && novel.prompts.visual ? novel.prompts.visual : "") %>,
+            image: <%- JSON.stringify(novel.prompts && novel.prompts.image ? novel.prompts.image : "") %>,
+            visual_setting: <%- JSON.stringify(novel.prompts && novel.prompts.visual_setting ? novel.prompts.visual_setting : "") %>
         }
+    };
 
-        alpineData.isSubmitting = true;
-        alpineData.errorMsg = "";
-
-        try {
-            const res = await fetch('/chapter/<%= chapter._id %>/import', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rawScript: scriptContent }) 
-            });
-
-            if (res.status === 413) throw new Error("内容太长了！");
-
-            const result = await res.json();
-
-            if (result.success) {
-                // [核心] 触发事件，更新父级 x-data 中的 panels
-                // Alpine 的 dispatch 可以让外部监听
-                dispatch('panels-updated', result.data);
-                
-                // 也可以直接在成功提示里把 errorMsg 当 successMsg 用一下（偷懒做法）
-                // 更好的做法是用 toast，这里简单清空错误
-                alpineData.errorMsg = ""; 
-            } else {
-                alpineData.errorMsg = result.message || "解析失败";
-            }
-
-        } catch (err) {
-            console.error(err);
-            alpineData.errorMsg = err.message || "请求出错";
-        } finally {
-            alpineData.isSubmitting = false;
-        }
-    }
-
-    // ... (保留 copyPanelPrompt, generatePrompt 等其他 JS 函数) ...
-    // 注意：copyPanelPrompt 要改为挂载在 window 上，或者确保 Alpine 能调用到
-    window.copyPanelPrompt = async function(chapterId, panelId, btn) {
-        const originalHtml = btn.innerHTML;
-        btn.innerHTML = '<span>⌛</span>';
-        btn.classList.add('opacity-75', 'cursor-wait');
-        
-        try {
-            const res = await fetch(`/chapter/${chapterId}/panel/${panelId}/prompt`);
-            const json = await res.json();
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('chapterDetail', () => ({
+            activeTab: window.CHAPTER_DATA.activeTab,
+            panels: window.CHAPTER_DATA.panels,
+            settingText: window.CHAPTER_DATA.settingText,
+            styleImage: `/images/${window.CHAPTER_DATA.novelId}/ep${window.CHAPTER_DATA.chapterOrder}/style.png?t=` + Date.now(),
             
-            if (json.success) {
-                await navigator.clipboard.writeText(json.data);
-                btn.innerHTML = '<span>✅</span>';
-                btn.classList.replace('bg-blue-50', 'bg-green-50');
-                btn.classList.replace('text-blue-600', 'text-green-600');
-            } else {
-                btn.innerHTML = '<span>❌</span>';
+            rawScript: localStorage.getItem(`aimanga_script_cache_${window.CHAPTER_DATA.chapterId}`) || '',
+            isSaving: false,
+            isUploading: false,
+            isSubmitting: false,
+            errorMsg: '',
+
+            switchTab(tab) {
+                this.activeTab = tab;
+            },
+
+            saveSettingText() {
+                this.isSaving = true;
+                fetch(`/chapter/${window.CHAPTER_DATA.chapterId}/save_setting_text`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ text: this.settingText })
+                }).then(() => this.isSaving = false);
+            },
+
+            saveScriptCache() {
+                localStorage.setItem(`aimanga_script_cache_${window.CHAPTER_DATA.chapterId}`, this.rawScript);
+            },
+
+            uploadStyle(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                this.isUploading = true;
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const res = await fetch(`/chapter/${window.CHAPTER_DATA.chapterId}/upload_style`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ image: e.target.result })
+                        });
+                        const result = await res.json();
+                        if (result.success) {
+                            this.styleImage = `/images/${window.CHAPTER_DATA.novelId}/ep${window.CHAPTER_DATA.chapterOrder}/style.png?t=` + Date.now();
+                        } else {
+                            alert(result.message);
+                        }
+                    } catch (err) {
+                        alert('上传失败');
+                    } finally {
+                        this.isUploading = false;
+                    }
+                };
+                reader.readAsDataURL(file);
+            },
+
+            async importScript() {
+                if (!this.rawScript.trim()) return;
+                this.isSubmitting = true;
+                this.errorMsg = '';
+                
+                try {
+                    const res = await fetch(`/chapter/${window.CHAPTER_DATA.chapterId}/import`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rawScript: this.rawScript }) 
+                    });
+                    
+                    const result = await res.json();
+                    if (result.success) {
+                        this.panels = result.data;
+                    } else {
+                        this.errorMsg = result.message;
+                    }
+                } catch (err) {
+                    this.errorMsg = "网络请求出错";
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            getImageUrl(index) {
+                return `/images/${window.CHAPTER_DATA.novelId}/ep${window.CHAPTER_DATA.chapterOrder}/${index + 1}.png`;
+            },
+            openImage(index) {
+                window.open(this.getImageUrl(index), '_blank');
+            },
+
+            async copyPanelPrompt(panelId, btn) {
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '⌛';
+                try {
+                    const res = await fetch(`/chapter/${window.CHAPTER_DATA.chapterId}/panel/${panelId}/prompt`);
+                    const json = await res.json();
+                    if (json.success) {
+                        await navigator.clipboard.writeText(json.data);
+                        btn.innerHTML = '✅';
+                    } else { btn.innerHTML = '❌'; }
+                } catch (e) { btn.innerHTML = '❌'; }
+                setTimeout(() => { btn.innerHTML = originalHtml; }, 1000);
             }
-        } catch (e) {
-            btn.innerHTML = '<span>❌</span>';
-        }
+        }));
+    });
 
-        setTimeout(() => {
-            btn.innerHTML = originalHtml;
-            btn.classList.remove('opacity-75', 'cursor-wait');
-            btn.classList.replace('bg-green-50', 'bg-blue-50');
-            btn.classList.replace('text-green-600', 'text-blue-600');
-        }, 1500);
-    };
-    
-    // ... (generatePrompt, copyResult 保持不变) ...
-    const NOVEL_PROMPTS = {
-        script: <%- JSON.stringify(novel.prompts && novel.prompts.script ? novel.prompts.script : "") %>,
-        visual: <%- JSON.stringify(novel.prompts && novel.prompts.visual ? novel.prompts.visual : "") %>,
-        image: <%- JSON.stringify(novel.prompts && novel.prompts.panel ? novel.prompts.panel : "") %>
-    };
-    
     window.generatePrompt = function(type) {
-        const content = document.getElementById('sourceContent').value;
-        const template = NOVEL_PROMPTS[type] || "";
-        let fullPrompt = "";
-        if (template.includes("{content}")) {
-            fullPrompt = template.replace(/{content}/g, content);
+        let content = "";
+        if (type === 'visual_setting') {
+            content = document.getElementById('settingInput').value || "";
         } else {
-            fullPrompt = template + "\n\n" + content;
+            content = document.getElementById('sourceContent').value || "";
         }
-        document.getElementById('resultOutput').value = fullPrompt;
-        document.getElementById('resultOutput').focus();
+        
+        const template = window.CHAPTER_DATA.prompts[type] || "";
+        let fullPrompt = template.includes("{content}") ? template.replace(/{content}/g, content) : (template + "\n\n" + content);
+
+        let outputId = type === 'visual_setting' ? 'settingOutput' : 'resultOutput';
+        const outputEl = document.getElementById(outputId);
+        if (outputEl) { 
+            outputEl.value = fullPrompt; 
+            outputEl.focus();
+        }
     };
 
-    window.copyResult = function(btn) {
-        const output = document.getElementById('resultOutput');
+    window.copyResult = function(btn, targetId) {
+        const output = document.getElementById(targetId);
         output.select();
         navigator.clipboard.writeText(output.value).then(() => {
-            const originalText = btn.innerText;
-            btn.innerText = '✅ 已复制';
-            setTimeout(() => { btn.innerText = originalText; }, 2000);
+            const originalText = btn.innerText; 
+            btn.innerText = '✅';
+            setTimeout(() => btn.innerText = originalText, 1000);
         });
     };
 </script>

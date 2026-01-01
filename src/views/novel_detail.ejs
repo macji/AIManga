@@ -1,270 +1,299 @@
 <%- include('partials/header') %>
 
-<div class="space-y-6" x-data="{ promptTab: 'script' }"> <div class="flex items-center justify-end">
-        <div class="flex gap-3">
-            <button onclick="document.getElementById('promptSettingsModal').showModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 shadow-sm transition flex items-center gap-1">
-                <span>⚙️</span> 提示词配置
-            </button>
-            
-            <button onclick="document.getElementById('editNovelModal').showModal()" class="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm hover:bg-slate-50 transition">
-                编辑信息
-            </button>
-            <button onclick="document.getElementById('addChapterModal').showModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 shadow-sm transition flex items-center">
-                <span class="mr-1">+</span> 新增章节
-            </button>
-        </div>
+<div class="max-w-6xl mx-auto px-4" x-data="{ 
+    showEditInfo: false,
+    showPromptSettings: false,
+    promptTab: 'script',
+    showCreateChapter: false,
+    showEditChapter: false,
+    editData: { id: '', title: '', order: '', content: '' }
+}">
+    
+    <div class="flex items-center gap-2 text-sm text-slate-500 mb-6 mt-4">
+        <a href="/" class="hover:text-blue-600 transition-colors">作品库</a>
+        <span>/</span>
+        <span class="text-slate-800 font-medium"><%= novel.title %></span>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex gap-6">
-        <div class="w-32 h-44 flex-shrink-0 bg-slate-200 rounded-lg overflow-hidden relative group">
-            <img src="<%= novel.cover %>" class="w-full h-full object-cover" alt="Cover">
-            <div class="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition"></div>
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-8 mb-8 flex gap-8 items-start">
+        <div class="w-40 h-56 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex-shrink-0 flex items-center justify-center text-5xl shadow-inner text-slate-400 font-serif select-none">
+            <%= novel.title.substring(0,1) %>
         </div>
-        <div class="flex-1">
-            <h1 class="text-2xl font-bold text-slate-800 mb-2"><%= novel.title %></h1>
-            <div class="flex items-center gap-4 text-sm text-slate-500 mb-4">
-                <span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-xs font-medium">
-                    <%= novel.status === 'serial' ? '连载中' : '已完结' %>
-                </span>
-                <span>作者: <%= novel.author %></span>
-                <span>创建于: <%= new Date(novel.createdAt).toLocaleDateString() %></span>
+        
+        <div class="flex-1 min-w-0 py-2">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-800 mb-3"><%= novel.title %></h1>
+                    <div class="flex flex-wrap gap-4 text-sm text-slate-500 mb-6">
+                        <span class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full <%= novel.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700' %> font-medium text-xs">
+                            <span class="w-1.5 h-1.5 rounded-full <%= novel.status === 'completed' ? 'bg-green-500' : 'bg-blue-500' %>"></span>
+                            <%= novel.status === 'completed' ? '已完结' : '连载中' %>
+                        </span>
+                        <span class="flex items-center gap-1">👤 <%= novel.author || '未知作者' %></span>
+                        <span class="flex items-center gap-1">📚 <%= chapters.length %> 章节</span>
+                        <span class="flex items-center gap-1">📅 <%= new Date(novel.createdAt).toLocaleDateString() %></span>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button @click="showEditInfo = true" class="px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 hover:border-slate-400 transition shadow-sm flex items-center gap-2">
+                        <span>📝</span> 修改信息
+                    </button>
+                    <button @click="showPromptSettings = true" class="px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition shadow-sm flex items-center gap-2">
+                        <span>⚙️</span> 提示词配置
+                    </button>
+                    <div class="w-px h-8 bg-slate-200 mx-1"></div>
+                    <button @click="showCreateChapter = true" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 shadow-md hover:shadow-lg transition flex items-center gap-2">
+                        <span>+</span> 新建章节
+                    </button>
+                </div>
             </div>
-            <p class="text-slate-600 text-sm leading-relaxed max-w-2xl whitespace-pre-wrap"><%= novel.description || '暂无简介...' %></p>
+
+            <div class="relative group">
+                <p class="text-slate-600 text-sm leading-relaxed whitespace-pre-line line-clamp-3 group-hover:line-clamp-none transition-all duration-300">
+                    <%= novel.description || '暂无简介...' %>
+                </p>
+            </div>
         </div>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-            <h3 class="font-semibold text-slate-700">章节列表 (<%= chapters.length %>)</h3>
+        <div class="px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <h2 class="font-bold text-lg text-slate-800">章节列表</h2>
+            <span class="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full">Total: <%= chapters.length %></span>
         </div>
-        <table class="w-full text-sm text-left">
-            <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
-                <tr>
-                    <th class="px-6 py-3 w-16">序号</th>
-                    <th class="px-6 py-3">章节标题</th>
-                    <th class="px-6 py-3 w-32">字数</th>
-                    <th class="px-6 py-3 w-48">更新时间</th>
-                    <th class="px-6 py-3 w-32 text-right">操作</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-                <% if (chapters.length === 0) { %>
-                <tr>
-                    <td colspan="5" class="px-6 py-12 text-center text-slate-400">暂无章节</td>
-                </tr>
-                <% } else { %>
-                    <% chapters.forEach(function(chapter) { %>
-                    <tr class="hover:bg-slate-50 transition group">
-                        <td class="px-6 py-4 text-slate-400 font-mono text-xs">#<%= chapter.order %></td>
-                        <td class="px-6 py-4 font-medium text-slate-700">
-                            <a href="/chapter/<%= chapter._id %>" class="hover:text-blue-600 hover:underline"><%= chapter.title %></a>
-                        </td>
-                        <td class="px-6 py-4 text-slate-500"><%= chapter.content.length %> 字</td>
-                        <td class="px-6 py-4 text-slate-400 text-xs"><%= new Date(chapter.updatedAt).toLocaleString() %></td>
-                        <td class="px-6 py-4 text-right flex justify-end gap-3">
-                            <button onclick="openEditChapter('<%= chapter._id %>')" class="text-blue-600 hover:text-blue-800 font-medium opacity-0 group-hover:opacity-100 transition">编辑</button>
-                            <form action="/chapter/<%= chapter._id %>/delete" method="POST" onsubmit="return confirm('确定删除？')">
-                                <button type="submit" class="text-red-500 hover:text-red-700 font-medium opacity-0 group-hover:opacity-100 transition">删除</button>
+        
+        <% if (chapters.length === 0) { %>
+            <div class="p-16 text-center text-slate-400">
+                <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">📭</div>
+                <p>还没有章节，点击右上角新建一个吧</p>
+            </div>
+        <% } else { %>
+            <div class="divide-y divide-slate-100">
+                <% chapters.forEach(chapter => { %>
+                    <div class="group px-8 py-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center gap-6 flex-1 min-w-0">
+                            <span class="text-slate-300 font-mono text-lg font-bold w-8 text-right italic">#<%= chapter.order %></span>
+                            <div class="min-w-0">
+                                <a href="/chapter/<%= chapter._id %>" class="block text-slate-800 text-base font-medium hover:text-blue-600 transition-colors truncate mb-1">
+                                    <%= chapter.title %>
+                                </a>
+                                <div class="flex items-center gap-3 text-xs">
+                                    <span class="text-slate-400"><%= new Date(chapter.updatedAt).toLocaleString() %></span>
+                                    <% if (chapter.script_data && chapter.script_data.length > 0) { %>
+                                        <span class="text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                                            🎬 <%= chapter.script_data.length %> P
+                                        </span>
+                                    <% } %>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-200">
+                            <textarea id="content-<%= chapter._id %>" class="hidden"><%= chapter.content %></textarea>
+                            
+                            <button @click="editData = { id: '<%= chapter._id %>', title: '<%= chapter.title %>', order: '<%= chapter.order %>', content: document.getElementById('content-<%= chapter._id %>').value }; showEditChapter = true;" 
+                                class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="编辑">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            
+                            <form action="/chapter/<%= chapter._id %>/delete" method="POST" onsubmit="return confirm('确定要删除这个章节吗？此操作不可恢复！');">
+                                <button type="submit" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="删除">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
                             </form>
-                        </td>
-                    </tr>
-                    <% }); %>
-                <% } %>
-            </tbody>
-        </table>
+                            
+                            <a href="/chapter/<%= chapter._id %>" class="ml-2 px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded hover:bg-blue-600 hover:text-white transition-colors">
+                                进入制作 →
+                            </a>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+        <% } %>
     </div>
+
+    <div x-show="showPromptSettings" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" @click="showPromptSettings = false"></div>
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl relative z-10 overflow-hidden flex flex-col max-h-[85vh] transform transition-all">
+            
+            <div class="px-6 py-4 border-b border-slate-100 bg-white flex justify-between items-center flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">⚙️</span>
+                    <h3 class="font-bold text-lg text-slate-800">提示词 (Prompt) 全局配置</h3>
+                </div>
+                <button @click="showPromptSettings = false" class="text-slate-400 hover:text-slate-600 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <form action="/novel/<%= novel._id %>/update" method="POST" class="flex-1 flex flex-col min-h-0">
+                <div class="flex border-b border-slate-200 bg-slate-50/50 px-6 pt-4 gap-2 flex-shrink-0 overflow-x-auto">
+                    
+                    <button type="button" @click="promptTab = 'script'" 
+                        :class="{ 'bg-white border-t-2 border-indigo-500 text-indigo-700 font-bold shadow-sm': promptTab === 'script', 'text-slate-500 hover:text-slate-700 hover:bg-slate-100': promptTab !== 'script' }"
+                        class="px-5 py-2.5 rounded-t-lg text-sm transition-all flex items-center gap-2 border-b-0 border-x border-t border-transparent">
+                        <span>🎬</span> 剧本生成
+                    </button>
+
+                    <button type="button" @click="promptTab = 'visual'" 
+                        :class="{ 'bg-white border-t-2 border-pink-500 text-pink-700 font-bold shadow-sm': promptTab === 'visual', 'text-slate-500 hover:text-slate-700 hover:bg-slate-100': promptTab !== 'visual' }"
+                        class="px-5 py-2.5 rounded-t-lg text-sm transition-all flex items-center gap-2 border-b-0 border-x border-t border-transparent">
+                        <span>👁️</span> 视觉提取
+                    </button>
+
+                    <button type="button" @click="promptTab = 'setting'" 
+                        :class="{ 'bg-white border-t-2 border-purple-500 text-purple-700 font-bold shadow-sm': promptTab === 'setting', 'text-slate-500 hover:text-slate-700 hover:bg-slate-100': promptTab !== 'setting' }"
+                        class="px-5 py-2.5 rounded-t-lg text-sm transition-all flex items-center gap-2 border-b-0 border-x border-t border-transparent">
+                        <span>🎨</span> 视觉设定
+                    </button>
+
+                    <button type="button" @click="promptTab = 'image'" 
+                        :class="{ 'bg-white border-t-2 border-blue-500 text-blue-700 font-bold shadow-sm': promptTab === 'image', 'text-slate-500 hover:text-slate-700 hover:bg-slate-100': promptTab !== 'image' }"
+                        class="px-5 py-2.5 rounded-t-lg text-sm transition-all flex items-center gap-2 border-b-0 border-x border-t border-transparent">
+                        <span>🖼️</span> 分镜生图
+                    </button>
+
+                    <button type="button" @click="promptTab = 'audio'" 
+                        :class="{ 'bg-white border-t-2 border-emerald-500 text-emerald-700 font-bold shadow-sm': promptTab === 'audio', 'text-slate-500 hover:text-slate-700 hover:bg-slate-100': promptTab !== 'audio' }"
+                        class="px-5 py-2.5 rounded-t-lg text-sm transition-all flex items-center gap-2 border-b-0 border-x border-t border-transparent">
+                        <span>🗣️</span> 语音字幕
+                    </button>
+                </div>
+
+                <div class="flex-1 p-6 overflow-y-auto bg-white">
+                    
+                    <div x-show="promptTab === 'script'" class="h-full flex flex-col space-y-3">
+                        <div class="flex justify-between items-center">
+                            <label class="text-sm font-bold text-indigo-900">Text to Script Template</label>
+                            <span class="text-xs text-indigo-400 bg-indigo-50 px-2 py-1 rounded">变量: {content}</span>
+                        </div>
+                        <p class="text-xs text-slate-500">将小说原文改编为包含景别、画面描述、台词的标准漫画/视频脚本。</p>
+                        <textarea name="prompts[script]" class="flex-1 w-full p-4 border border-indigo-100 rounded-xl text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none bg-indigo-50/30 text-slate-700 leading-relaxed" placeholder="输入您的剧本生成提示词模板..."><%= novel.prompts ? novel.prompts.script : '' %></textarea>
+                    </div>
+
+                    <div x-show="promptTab === 'visual'" class="h-full flex flex-col space-y-3" style="display: none;">
+                        <div class="flex justify-between items-center">
+                            <label class="text-sm font-bold text-pink-900">Text to Visual Template</label>
+                            <span class="text-xs text-pink-400 bg-pink-50 px-2 py-1 rounded">变量: {content}</span>
+                        </div>
+                        <p class="text-xs text-slate-500">从文本中提取环境、光影、人物衣着等纯视觉元素，用于辅助生图。</p>
+                        <textarea name="prompts[visual]" class="flex-1 w-full p-4 border border-pink-100 rounded-xl text-sm font-mono focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none resize-none bg-pink-50/30 text-slate-700 leading-relaxed" placeholder="输入您的视觉提取提示词模板..."><%= novel.prompts ? novel.prompts.visual : '' %></textarea>
+                    </div>
+
+                    <div x-show="promptTab === 'setting'" class="h-full flex flex-col space-y-3" style="display: none;">
+                        <div class="flex justify-between items-center">
+                            <label class="text-sm font-bold text-purple-900">Text to Setting Template</label>
+                            <span class="text-xs text-purple-400 bg-purple-50 px-2 py-1 rounded">变量: {content}</span>
+                        </div>
+                        <p class="text-xs text-slate-500">生成用于统一画风的角色三视图、场景概念图的 Stable Diffusion / Midjourney 提示词。</p>
+                        <textarea name="prompts[visual_setting]" class="flex-1 w-full p-4 border border-purple-100 rounded-xl text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none bg-purple-50/30 text-slate-700 leading-relaxed" placeholder="输入您的视觉设定提示词模板..."><%= novel.prompts ? novel.prompts.visual_setting : '' %></textarea>
+                    </div>
+
+                    <div x-show="promptTab === 'image'" class="h-full flex flex-col space-y-3" style="display: none;">
+                        <div class="flex justify-between items-center">
+                            <label class="text-sm font-bold text-blue-900">Card to Image Template</label>
+                            <span class="text-xs text-blue-400 bg-blue-50 px-2 py-1 rounded">变量: {content}</span>
+                        </div>
+                        <p class="text-xs text-slate-500">根据单个分镜卡片的描述（Visual）生成最终画面的提示词。通常包含画质词和风格词。</p>
+                        <textarea name="prompts[image]" class="flex-1 w-full p-4 border border-blue-100 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none bg-blue-50/30 text-slate-700 leading-relaxed" placeholder="例如: (Masterpiece, Best Quality), {content}, anime style --ar 16:9"><%= novel.prompts ? novel.prompts.image : '' %></textarea>
+                    </div>
+
+                    <div x-show="promptTab === 'audio'" class="h-full flex flex-col space-y-3" style="display: none;">
+                        <div class="flex justify-between items-center">
+                            <label class="text-sm font-bold text-emerald-900">Audio & Subtitle Template</label>
+                            <span class="text-xs text-emerald-400 bg-emerald-50 px-2 py-1 rounded">变量: {content}</span>
+                        </div>
+                        <p class="text-xs text-slate-500">提取对话、旁白，生成配音台本或字幕文件（SRT/VTT）的格式。</p>
+                        <textarea name="prompts[audio]" class="flex-1 w-full p-4 border border-emerald-100 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none bg-emerald-50/30 text-slate-700 leading-relaxed" placeholder="输入您的语音字幕提示词模板..."><%= novel.prompts ? novel.prompts.audio : '' %></textarea>
+                    </div>
+
+                </div>
+
+                <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
+                    <button type="button" @click="showPromptSettings = false" class="px-5 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-medium transition">取消</button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-md transition transform active:scale-95">保存所有配置</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="showCreateChapter" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="showCreateChapter = false"></div>
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <h3 class="font-bold text-lg text-slate-800">📝 新建章节</h3>
+                <button @click="showCreateChapter = false" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+            </div>
+            <form action="/chapter/create" method="POST" class="flex-1 overflow-y-auto">
+                <input type="hidden" name="novelId" value="<%= novel._id %>">
+                <div class="p-6 space-y-4">
+                    <div><label class="block text-sm font-medium text-slate-700 mb-1">章节标题</label><input type="text" name="title" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div><label class="block text-sm font-medium text-slate-700 mb-1">排序</label><input type="number" name="order" value="<%= chapters.length + 1 %>" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div><label class="block text-sm font-medium text-slate-700 mb-1">内容</label><textarea name="content" rows="10" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"></textarea></div>
+                </div>
+                <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                    <button type="button" @click="showCreateChapter = false" class="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-medium transition">取消</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">立即创建</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="showEditChapter" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="showEditChapter = false"></div>
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <h3 class="font-bold text-lg text-slate-800">✏️ 编辑章节</h3>
+                <button @click="showEditChapter = false" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+            </div>
+            <form :action="'/chapter/' + editData.id + '/update'" method="POST" class="flex-1 overflow-y-auto">
+                <input type="hidden" name="novelId" value="<%= novel._id %>">
+                <div class="p-6 space-y-4">
+                    <div><label class="block text-sm font-medium text-slate-700 mb-1">章节标题</label><input type="text" name="title" x-model="editData.title" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div><label class="block text-sm font-medium text-slate-700 mb-1">排序</label><input type="number" name="order" x-model="editData.order" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div><label class="block text-sm font-medium text-slate-700 mb-1">内容</label><textarea name="content" x-model="editData.content" rows="10" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"></textarea></div>
+                </div>
+                <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                    <button type="button" @click="showEditChapter = false" class="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-medium transition">取消</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">保存修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="showEditInfo" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="showEditInfo = false"></div>
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <h3 class="font-bold text-lg text-slate-800">📝 修改基础信息</h3>
+                <button @click="showEditInfo = false" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+            </div>
+            
+            <form action="/novel/<%= novel._id %>/update" method="POST" class="flex-1 overflow-y-auto">
+                <div class="p-6 space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="block text-sm font-medium text-slate-700 mb-1">作品名称</label><input type="text" name="title" value="<%= novel.title %>" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                        <div><label class="block text-sm font-medium text-slate-700 mb-1">作者</label><input type="text" name="author" value="<%= novel.author %>" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">状态</label>
+                        <select name="status" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="serial" <%= novel.status === 'serial' ? 'selected' : '' %>>连载中</option>
+                            <option value="completed" <%= novel.status === 'completed' ? 'selected' : '' %>>已完结</option>
+                        </select>
+                    </div>
+                    <div><label class="block text-sm font-medium text-slate-700 mb-1">简介</label><textarea name="description" rows="4" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"><%= novel.description %></textarea></div>
+                </div>
+                <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                    <button type="button" @click="showEditInfo = false" class="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-medium transition">取消</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">保存信息</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </div>
 
-<dialog id="promptSettingsModal" class="p-0 rounded-xl shadow-2xl backdrop:bg-slate-900/40 w-full max-w-4xl open:animate-fade-in">
-    <div class="flex flex-col h-[85vh]" x-data="{ activeTab: 'script' }">
-        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-            <h3 class="text-lg font-bold text-slate-800">提示词配置 (Prompt Settings)</h3>
-            <button onclick="document.getElementById('promptSettingsModal').close()" class="text-slate-400 hover:text-slate-600">✕</button>
-        </div>
-
-        <form action="/novel/<%= novel._id %>/update" method="POST" class="flex-1 flex flex-col overflow-hidden">
-            <input type="hidden" name="title" value="<%= novel.title %>">
-            
-            <div class="px-6 pt-4 flex gap-2 border-b border-slate-200">
-                <button type="button" @click="activeTab = 'script'" :class="activeTab === 'script' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-500 hover:text-slate-700'" class="px-4 py-2 border-b-2 font-medium text-sm transition">
-                    剧本生成 (Script)
-                </button>
-                <button type="button" @click="activeTab = 'visual'" :class="activeTab === 'visual' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-500 hover:text-slate-700'" class="px-4 py-2 border-b-2 font-medium text-sm transition">
-                    视觉设定 (Visual)
-                </button>
-                <button type="button" @click="activeTab = 'image'" :class="activeTab === 'image' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-500 hover:text-slate-700'" class="px-4 py-2 border-b-2 font-medium text-sm transition">
-                    画面生图 (Image)
-                </button>
-                <button type="button" @click="activeTab = 'audio'" :class="activeTab === 'audio' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-500 hover:text-slate-700'" class="px-4 py-2 border-b-2 font-medium text-sm transition">
-                    语音字幕 (Audio)
-                </button>
-            </div>
-
-            <div class="flex-1 p-6 overflow-y-auto bg-slate-50/50">
-                
-                <div x-show="activeTab === 'script'" class="h-full flex flex-col">
-                    <label class="block text-sm font-bold text-slate-700 mb-2">小说转脚本 Prompt 模板</label>
-                    <p class="text-xs text-slate-500 mb-2">用于指导大模型将小说原文拆解为分镜脚本。</p>
-                    <textarea name="prompts[script]" class="flex-1 w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none font-mono text-sm leading-relaxed resize-none"><%= novel.prompts ? novel.prompts.script : '' %></textarea>
-                </div>
-
-                <div x-show="activeTab === 'visual'" class="h-full flex flex-col" style="display: none;">
-                    <label class="block text-sm font-bold text-slate-700 mb-2">视觉设定提取 Prompt 模板</label>
-                    <p class="text-xs text-slate-500 mb-2">用于提取角色外貌、场景特征。</p>
-                    <textarea name="prompts[visual]" class="flex-1 w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none font-mono text-sm leading-relaxed resize-none"><%= novel.prompts ? novel.prompts.visual : '' %></textarea>
-                </div>
-
-                <div x-show="activeTab === 'image'" class="h-full flex flex-col" style="display: none;">
-                    <label class="block text-sm font-bold text-slate-700 mb-2">生图基础 Prompt (Base Style)</label>
-                    <p class="text-xs text-slate-500 mb-2">这些词会自动追加到每一个分镜的生图提示词前面，通常用于统一定义画风、质量词。</p>
-                    <textarea name="prompts[image]" class="flex-1 w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none font-mono text-sm leading-relaxed resize-none"><%= novel.prompts ? novel.prompts.image : '' %></textarea>
-                </div>
-
-                <div x-show="activeTab === 'audio'" class="h-full flex flex-col" style="display: none;">
-                    <label class="block text-sm font-bold text-slate-700 mb-2">语音/字幕提取 Prompt 模板</label>
-                    <p class="text-xs text-slate-500 mb-2">用于生成 TTS 所需的 JSON 数据。</p>
-                    <textarea name="prompts[audio]" class="flex-1 w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none font-mono text-sm leading-relaxed resize-none"><%= novel.prompts ? novel.prompts.audio : '' %></textarea>
-                </div>
-            </div>
-
-            <div class="px-6 py-4 bg-white border-t border-slate-100 flex justify-end gap-3">
-                <button type="button" onclick="document.getElementById('promptSettingsModal').close()" class="px-5 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm transition">取消</button>
-                <button type="submit" class="px-5 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 shadow-sm transition font-medium">保存配置</button>
-            </div>
-        </form>
-    </div>
-</dialog>
-
-<dialog id="editNovelModal" class="p-0 rounded-xl shadow-2xl backdrop:bg-slate-900/40 w-full max-w-lg open:animate-fade-in">
-    <div class="bg-white">
-        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 class="text-lg font-bold text-slate-800">编辑作品信息</h3>
-            <button onclick="document.getElementById('editNovelModal').close()" class="text-slate-400 hover:text-slate-600">✕</button>
-        </div>
-        <form action="/novel/<%= novel._id %>/update" method="POST" class="p-6 space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">作品名称</label>
-                <input type="text" name="title" value="<%= novel.title %>" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">作者</label>
-                    <input type="text" name="author" value="<%= novel.author %>" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">连载状态</label>
-                    <select name="status" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
-                        <option value="serial" <%= novel.status === 'serial' ? 'selected' : '' %>>连载中</option>
-                        <option value="completed" <%= novel.status === 'completed' ? 'selected' : '' %>>已完结</option>
-                    </select>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">封面图片链接</label>
-                <input type="text" name="cover" value="<%= novel.cover %>" placeholder="https://..." class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono text-slate-600">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">作品简介</label>
-                <textarea name="description" rows="4" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"><%= novel.description %></textarea>
-            </div>
-            <div class="pt-2 flex justify-end gap-3">
-                <button type="button" onclick="document.getElementById('editNovelModal').close()" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-sm transition">取消</button>
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 shadow-sm transition font-medium">保存修改</button>
-            </div>
-        </form>
-    </div>
-</dialog>
-
-<dialog id="addChapterModal" class="p-0 rounded-xl shadow-2xl backdrop:bg-slate-900/40 w-full max-w-2xl open:animate-fade-in">
-    <div class="flex flex-col h-[80vh]">
-        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 class="text-lg font-bold text-slate-800">新建章节</h3>
-            <button onclick="document.getElementById('addChapterModal').close()" class="text-slate-400 hover:text-slate-600">✕</button>
-        </div>
-        <form action="/chapter/create" method="POST" class="flex-1 flex flex-col overflow-hidden">
-            <input type="hidden" name="novelId" value="<%= novel._id %>">
-            
-            <div class="p-6 flex-1 overflow-y-auto space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">
-                        章节序号 <span class="text-slate-400 font-normal">(用于生成 ep 文件夹，如 ep1)</span>
-                    </label>
-                    <input type="number" name="order" placeholder="默认自动递增，也可手动指定..." 
-                           class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition font-mono">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">章节标题</label>
-                    <input type="text" name="title" placeholder="例如：第1章 穿越" required 
-                           class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                </div>
-                
-                <div class="flex-1 flex flex-col h-full">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">正文内容</label>
-                    <textarea name="content" placeholder="在此粘贴小说正文..." required
-                              class="w-full flex-1 min-h-[300px] px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition font-mono text-sm leading-relaxed resize-none"></textarea>
-                </div>
-            </div>
-
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button type="button" onclick="document.getElementById('addChapterModal').close()" class="px-5 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm transition">取消</button>
-                <button type="submit" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 shadow-sm transition font-medium">保存章节</button>
-            </div>
-        </form>
-    </div>
-</dialog>
-
-<dialog id="editChapterModal" class="p-0 rounded-xl shadow-2xl backdrop:bg-slate-900/40 w-full max-w-2xl open:animate-fade-in">
-    <div class="flex flex-col h-[80vh]">
-        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 class="text-lg font-bold text-slate-800">编辑章节</h3>
-            <button onclick="document.getElementById('editChapterModal').close()" class="text-slate-400 hover:text-slate-600">✕</button>
-        </div>
-        <form id="editChapterForm" action="" method="POST" class="flex-1 flex flex-col overflow-hidden">
-            <input type="hidden" name="novelId" value="<%= novel._id %>">
-            <div class="p-6 flex-1 overflow-y-auto space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">章节序号</label>
-                    <input type="number" id="editChapterOrder" name="order" required 
-                           class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">章节标题</label>
-                    <input type="text" id="editChapterTitle" name="title" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                </div>
-                <div class="flex-1 flex flex-col h-full">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">正文内容</label>
-                    <textarea id="editChapterContent" name="content" required class="w-full flex-1 min-h-[300px] px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition font-mono text-sm leading-relaxed resize-none"></textarea>
-                </div>
-            </div>
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button type="button" onclick="document.getElementById('editChapterModal').close()" class="px-5 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm transition">取消</button>
-                <button type="submit" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 shadow-sm transition font-medium">保存修改</button>
-            </div>
-        </form>
-    </div>
-</dialog>
-
 <script src="//unpkg.com/alpinejs" defer></script>
-<script>
-    const localChapters = <%- JSON.stringify(chapters) %>;
-    function openEditChapter(chapterId) {
-        const chapter = localChapters.find(c => c._id === chapterId);
-        if (!chapter) return;
-        
-        const form = document.getElementById('editChapterForm');
-        const orderInput = document.getElementById('editChapterOrder');
-        const titleInput = document.getElementById('editChapterTitle');
-        const contentInput = document.getElementById('editChapterContent');
-        
-        form.action = `/chapter/${chapterId}/update`; 
-        orderInput.value = chapter.order;
-        titleInput.value = chapter.title;
-        contentInput.value = chapter.content;
-        
-        document.getElementById('editChapterModal').showModal();
-    }
-</script>
-
 <%- include('partials/footer') %>

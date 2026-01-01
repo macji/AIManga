@@ -6,10 +6,13 @@ const ChapterSchema = new mongoose.Schema({
     content: { type: String, required: true },
     order: { type: Number, default: 0 },
     
+    // [新增] 用于存储用户输入的视觉设定草稿
+    visual_setting_text: { type: String, default: "" },
+
     script_data: [{
         id: String,
-        visual: String,         // 存给人看的：完整 Markdown 格式脚本
-        prompt_visual: String,  // [新增] 存给AI看的：纯净画面描述拼接
+        visual: String,
+        prompt_visual: String,
         env: String,
         composition: String,
         lines: [{
