@@ -5,33 +5,27 @@
     
     <div class="bg-white border-b border-slate-200 px-6 pt-4 flex-shrink-0 shadow-sm z-20 relative">
         <div class="flex gap-1 overflow-x-auto no-scrollbar justify-center">
-            <button @click="switchTab('text')" 
-                :class="{ 'border-indigo-500 text-indigo-700 bg-indigo-50/50': activeTab === 'text', 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50': activeTab !== 'text' }"
-                class="px-6 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+            <button @click="switchTab('text')" :class="tabClass('text', 'indigo')" class="px-5 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
                 <span>📝</span> 提示词生成
             </button>
             
-            <button @click="switchTab('setting')" 
-                :class="{ 'border-purple-500 text-purple-700 bg-purple-50/50': activeTab === 'setting', 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50': activeTab !== 'setting' }"
-                class="px-6 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+            <button @click="switchTab('setting')" :class="tabClass('setting', 'purple')" class="px-5 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
                 <span>🎨</span> 视觉设定
             </button>
 
-            <button @click="switchTab('cards')" 
-                :class="{ 'border-blue-500 text-blue-700 bg-blue-50/50': activeTab === 'cards', 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50': activeTab !== 'cards' }"
-                class="px-6 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+            <button @click="switchTab('cards')" :class="tabClass('cards', 'blue')" class="px-5 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
                 <span>🎬</span> 分镜制作 <span class="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-xs ml-1" x-text="panels.length"></span>
             </button>
 
-            <button @click="switchTab('audio')" 
-                :class="{ 'border-emerald-500 text-emerald-700 bg-emerald-50/50': activeTab === 'audio', 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50': activeTab !== 'audio' }"
-                class="px-6 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+            <button @click="switchTab('split')" :class="tabClass('split', 'orange')" class="px-5 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+                <span>✂️</span> 图片分割
+            </button>
+
+            <button @click="switchTab('audio')" :class="tabClass('audio', 'emerald')" class="px-5 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
                 <span>🗣️</span> 语音字幕
             </button>
 
-            <button @click="switchTab('video')" 
-                :class="{ 'border-rose-500 text-rose-700 bg-rose-50/50': activeTab === 'video', 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50': activeTab !== 'video' }"
-                class="px-6 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+            <button @click="switchTab('video')" :class="tabClass('video', 'rose')" class="px-5 py-3 text-sm font-bold border-b-2 transition-all rounded-t-lg flex items-center gap-2 whitespace-nowrap">
                 <span>🎥</span> 视频生成
             </button>
         </div>
@@ -83,7 +77,7 @@
                     x-model="settingText"
                     @input.debounce.1000ms="saveSettingText()"
                     class="flex-1 w-full p-5 resize-none outline-none text-sm text-slate-700 font-mono bg-white leading-relaxed placeholder-slate-300" 
-                    placeholder="在此输入您构思的视觉设定（角色外貌、场景风格、画风要求等）..."></textarea>
+                    placeholder="在此输入您构思的视觉设定（角色外貌、场景风格、画风要求等）...&#10;&#10;例如：&#10;角色：银发红瞳的少女，身穿哥特洛丽塔风格的战斗服。&#10;环境：破败的未来都市，霓虹灯闪烁。&#10;风格：Anime style, thick coating, detailed background."></textarea>
             </div>
 
             <div class="flex flex-col gap-4 overflow-hidden h-full">
@@ -110,9 +104,11 @@
                         <img :src="styleImage" 
                              class="max-w-full max-h-full object-contain shadow-md rounded border border-slate-200"
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                        
                         <div class="absolute inset-0 flex-col items-center justify-center text-slate-400 hidden" style="display: none;">
                             <span class="text-5xl mb-3 opacity-20">🖼️</span>
                             <p class="text-sm font-medium">暂无风格图</p>
+                            <p class="text-xs opacity-60 mt-1">请上传大模型生成的设定图</p>
                         </div>
                     </div>
                 </div>
@@ -191,6 +187,53 @@
                 </div>
             </div>
         </div>
+
+        <div x-show="activeTab === 'split'" class="absolute inset-6 flex items-center justify-center bg-white border border-slate-200 rounded-xl" style="display: none;">
+            <div class="bg-white rounded-xl w-full max-w-2xl p-8 text-center" x-data="{ processing: false, logs: [] }">
+                <div class="w-20 h-20 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">
+                    ✂️
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">图片自动分割工具</h2>
+                <p class="text-slate-500 mb-8 max-w-md mx-auto leading-relaxed text-sm">
+                    系统将读取 <code>ep<%= chapter.order %></code> 目录下的所有 PNG 图片。<br>
+                    普通图片按 <span class="text-orange-600 font-mono bg-orange-50 px-1 rounded">2x2</span> 格式切割为 4 张 JPG；<br>
+                    封面/封底 (0.png, 99.png) 仅转换格式。<br>
+                    结果存入 <span class="font-mono bg-slate-100 px-1 rounded">ext/</span> 目录。
+                </p>
+
+                <button @click="
+                    processing = true; 
+                    logs = ['正在请求服务器处理...'];
+                    fetch('/chapter/<%= chapter._id %>/split_images', { method: 'POST' })
+                        .then(res => res.json())
+                        .then(data => {
+                            if(data.success) {
+                                logs.push('✅ ' + data.message);
+                                logs.push('📂 存放路径: assets/outputs/images/<%= novel._id %>/ep<%= chapter.order %>/ext/');
+                            } else {
+                                logs.push('❌ 失败: ' + data.message);
+                            }
+                        })
+                        .catch(e => logs.push('❌ 网络错误: ' + e.message))
+                        .finally(() => processing = false)
+                " 
+                :disabled="processing"
+                :class="{'opacity-75 cursor-wait': processing}"
+                class="px-8 py-3 bg-orange-600 text-white rounded-lg text-lg font-bold shadow-lg hover:bg-orange-700 hover:shadow-xl transition-all transform active:scale-95 flex items-center justify-center gap-3 mx-auto">
+                    <span x-show="!processing">🚀 开始分割处理</span>
+                    <span x-show="processing" class="flex items-center gap-2">
+                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        处理中...
+                    </span>
+                </button>
+
+                <div x-show="logs.length > 0" class="mt-8 text-left bg-slate-900 rounded-lg p-4 font-mono text-xs text-green-400 max-h-48 overflow-y-auto shadow-inner">
+                    <template x-for="log in logs">
+                        <div class="mb-1 border-b border-slate-800 pb-1 last:border-0 last:pb-0" x-text="log"></div>
+                    </template>
+                </div>
+            </div>
+        </div>
         
         <div x-show="activeTab === 'audio'" class="absolute inset-6 flex items-center justify-center bg-white border border-slate-200 rounded-xl border-dashed" style="display: none;">
             <div class="text-center text-slate-400">
@@ -246,6 +289,22 @@
                 this.activeTab = tab;
             },
 
+            // 辅助样式类
+            tabClass(tabName, color) {
+                const colors = {
+                    indigo: 'border-indigo-500 text-indigo-700 bg-indigo-50/50',
+                    purple: 'border-purple-500 text-purple-700 bg-purple-50/50',
+                    blue: 'border-blue-500 text-blue-700 bg-blue-50/50',
+                    orange: 'border-orange-500 text-orange-700 bg-orange-50/50',
+                    emerald: 'border-emerald-500 text-emerald-700 bg-emerald-50/50',
+                    rose: 'border-rose-500 text-rose-700 bg-rose-50/50',
+                };
+                return this.activeTab === tabName 
+                    ? `${colors[color]} border-transparent hover:text-slate-700` // Active
+                    : `border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50`; // Inactive
+            },
+
+            // 保存视觉设定草稿 (防抖)
             saveSettingText() {
                 this.isSaving = true;
                 fetch(`/chapter/${window.CHAPTER_DATA.chapterId}/save_setting_text`, {
@@ -259,6 +318,7 @@
                 localStorage.setItem(`aimanga_script_cache_${window.CHAPTER_DATA.chapterId}`, this.rawScript);
             },
 
+            // 上传风格图
             uploadStyle(event) {
                 const file = event.target.files[0];
                 if (!file) return;
@@ -287,6 +347,7 @@
                 reader.readAsDataURL(file);
             },
 
+            // 导入分镜
             async importScript() {
                 if (!this.rawScript.trim()) return;
                 this.isSubmitting = true;
@@ -335,6 +396,7 @@
         }));
     });
 
+    // 独立函数
     window.generatePrompt = function(type) {
         let content = "";
         if (type === 'visual_setting') {

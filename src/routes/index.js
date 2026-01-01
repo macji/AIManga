@@ -23,4 +23,6 @@ router.get('/chapter/:id/panel/:panelId/prompt', novelController.getPanelPrompt)
 router.post('/chapter/:id/save_setting_text', novelController.saveVisualSettingText);
 router.post('/chapter/:id/upload_style', novelController.uploadStyleImage);
 
+router.post('/chapter/:id/split_images', novelController.splitImages);
+
 export default router;

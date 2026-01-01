@@ -2,9 +2,7 @@ import Novel from '../models/Novel.js';
 import Chapter from '../models/Chapter.js';
 import fs from 'fs';
 import path from 'path';
-
-// --- 删除引用：import { buildImagePrompt } from '../prompt/index.js'; ---
-// 因为我们现在使用模板替换逻辑，不再需要这个函数
+import sharp from 'sharp';
 
 // 1. 渲染小说列表页
 export const renderNovelList = async (ctx) => {
@@ -112,12 +110,11 @@ export const renderChapterDetail = async (ctx) => {
     });
 };
 
-// 9. 导入脚本 (importScript)
+// 9. 导入脚本
 export const importScript = async (ctx) => {
     const { id } = ctx.params;
     const { rawScript } = ctx.request.body;
 
-    // --- 1. 清洗 JSON 数据 ---
     let jsonStr = "";
     try {
         const match = rawScript.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
@@ -141,7 +138,6 @@ export const importScript = async (ctx) => {
         return;
     }
 
-    // --- 2. 数据映射 (按 Page 聚合 + Markdown 格式化) ---
     let flatPanels = [];
     try {
         const pages = parsedData.pages || (Array.isArray(parsedData) ? parsedData : []);
@@ -150,14 +146,11 @@ export const importScript = async (ctx) => {
             pages.forEach((page, pIndex) => {
                 const pageNum = page.page_number || (pIndex + 1);
                 
-                // --- 构建显示用的 Markdown 文本 ---
                 let displayContent = `**P${pageNum}**\n\n`;
                 
-                // 处理 Panels
                 if (page.panels && Array.isArray(page.panels)) {
                     page.panels.forEach(p => {
                         const panelId = p.panel_id || "?";
-                        
                         displayContent += `**Panel ${panelId}**\n`;
                         displayContent += `* **景别：** ${p.shot_type || '未指定'}\n`;
                         displayContent += `* **画面：** ${p.visual_description || '-'}\n`;
@@ -176,7 +169,6 @@ export const importScript = async (ctx) => {
                         displayContent += `\n`; 
                     });
                 } 
-                // 兼容逻辑
                 else {
                     displayContent += `**Panel 1**\n`;
                     displayContent += `* **画面：** ${page.visual_description || page.visual || '-'}\n`;
@@ -198,13 +190,11 @@ export const importScript = async (ctx) => {
         return;
     }
 
-    // --- 3. 补充索引 (从 1 开始) ---
     flatPanels = flatPanels.map((panel, index) => ({
         ...panel,
         image_index: index + 1 
     }));
 
-    // --- 4. 自动创建目录 ---
     const chapter = await Chapter.findById(id);
     const novelIdStr = chapter.novelId.toString();
     const epFolder = `ep${chapter.order}`; 
@@ -214,7 +204,6 @@ export const importScript = async (ctx) => {
         fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    // --- 5. 更新 DB ---
     try {
         const updatedChapter = await Chapter.findByIdAndUpdate(id, {
             script_data: flatPanels
@@ -232,7 +221,7 @@ export const importScript = async (ctx) => {
     }
 };
 
-// 10. 获取单卡片 Prompt (无 buildImagePrompt 依赖)
+// 10. 获取单卡片 Prompt
 export const getPanelPrompt = async (ctx) => {
     const { id, panelId } = ctx.params; 
     const chapter = await Chapter.findById(id);
@@ -261,7 +250,7 @@ export const getPanelPrompt = async (ctx) => {
     ctx.body = { success: true, data: finalOutput };
 };
 
-// [新增] 保存视觉设定文本 (AJAX调用)
+// 11. 保存视觉设定文本
 export const saveVisualSettingText = async (ctx) => {
     const { id } = ctx.params;
     const { text } = ctx.request.body;
@@ -278,10 +267,10 @@ export const saveVisualSettingText = async (ctx) => {
     }
 };
 
-// [新增] 上传/保存视觉设定图 (style.png)
+// 12. 上传/保存视觉设定图
 export const uploadStyleImage = async (ctx) => {
     const { id } = ctx.params;
-    const { image } = ctx.request.body; // Base64 字符串
+    const { image } = ctx.request.body;
 
     if (!image) {
         ctx.status = 400;
@@ -295,16 +284,13 @@ export const uploadStyleImage = async (ctx) => {
         const epFolder = `ep${chapter.order}`; 
         const targetDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr, epFolder);
 
-        // 确保目录存在
         if (!fs.existsSync(targetDir)) {
             fs.mkdirSync(targetDir, { recursive: true });
         }
 
-        // 处理 Base64 (去掉 data:image/png;base64, 前缀)
         const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
         const dataBuffer = Buffer.from(base64Data, 'base64');
 
-        // 写入 style.png
         const filePath = path.join(targetDir, 'style.png');
         fs.writeFileSync(filePath, dataBuffer);
 
@@ -314,5 +300,108 @@ export const uploadStyleImage = async (ctx) => {
         console.error(err);
         ctx.status = 500;
         ctx.body = { success: false, message: "保存失败: " + err.message };
+    }
+};
+
+// 13. [核心更新] 图片分割逻辑 (Split Images)
+export const splitImages = async (ctx) => {
+    const { id } = ctx.params;
+
+    try {
+        const chapter = await Chapter.findById(id);
+        if (!chapter) throw new Error("章节不存在");
+
+        const novelIdStr = chapter.novelId.toString();
+        const epFolder = `ep${chapter.order}`; 
+        
+        // 源目录: assets/outputs/images/novelId/epX
+        const sourceDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr, epFolder);
+        // 目标目录: sourceDir/ext
+        const targetDir = path.join(sourceDir, 'ext');
+
+        if (!fs.existsSync(sourceDir)) {
+            throw new Error("图片目录不存在，请先生成图片");
+        }
+
+        // [新增] 每次处理前清空 ext 目录，确保无残留
+        if (fs.existsSync(targetDir)) {
+            // recursive: true 删除目录及其内容, force: true 忽略不存在的情况
+            fs.rmSync(targetDir, { recursive: true, force: true });
+        }
+        // 重新创建 ext 目录
+        fs.mkdirSync(targetDir, { recursive: true });
+
+        // 读取所有 png 文件 (排除 style.png)
+        const files = fs.readdirSync(sourceDir).filter(file => file.endsWith('.png') && file !== 'style.png');
+
+        if (files.length === 0) {
+            throw new Error("当前目录下没有可处理的 PNG 图片");
+        }
+
+        // [步骤 1] 扫描找出最大的数值 x (不包含 99)
+        let maxIndex = 0;
+        files.forEach(file => {
+            const name = path.parse(file).name; // 文件名 (不含后缀)
+            const num = parseInt(name, 10);
+            if (!isNaN(num) && num !== 99) {
+                if (num > maxIndex) maxIndex = num;
+            }
+        });
+
+        let processedCount = 0;
+
+        // [步骤 2] 并行处理
+        await Promise.all(files.map(async (file) => {
+            const fileName = path.parse(file).name;
+            const inputPath = path.join(sourceDir, file);
+
+            // 情况 A: 封面 0.png -> ext/0.jpg
+            if (fileName === '0') {
+                const outputPath = path.join(targetDir, '0.jpg');
+                await sharp(inputPath)
+                    .jpeg({ quality: 100 })
+                    .toFile(outputPath);
+            } 
+            // 情况 B: 封底 99.png -> ext/(x+1).jpg
+            else if (fileName === '99') {
+                const newName = `${maxIndex + 1}.jpg`;
+                const outputPath = path.join(targetDir, newName);
+                await sharp(inputPath)
+                    .jpeg({ quality: 100 })
+                    .toFile(outputPath);
+            } 
+            // 情况 C: 普通图片 -> 4分割 -> ext/x-1.jpg ...
+            else {
+                // 定义 4 个区域 (总尺寸 1792x2400 -> 子尺寸 896x1200)
+                const width = 896;
+                const height = 1200;
+                
+                const regions = [
+                    { left: 0, top: 0, suffix: '-1' },     // 左上
+                    { left: width, top: 0, suffix: '-2' }, // 右上
+                    { left: 0, top: height, suffix: '-3' },// 左下
+                    { left: width, top: height, suffix: '-4' } // 右下
+                ];
+
+                for (const region of regions) {
+                    const outputPath = path.join(targetDir, `${fileName}${region.suffix}.jpg`);
+                    await sharp(inputPath)
+                        .extract({ left: region.left, top: region.top, width: width, height: height })
+                        .jpeg({ quality: 100 })
+                        .toFile(outputPath);
+                }
+            }
+            processedCount++;
+        }));
+
+        ctx.body = { 
+            success: true, 
+            message: `处理完成！已先清空 ext 目录，共处理 ${processedCount} 张原图。` 
+        };
+
+    } catch (err) {
+        console.error(err);
+        ctx.status = 500;
+        ctx.body = { success: false, message: "图片分割失败: " + err.message };
     }
 };
