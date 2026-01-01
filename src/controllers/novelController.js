@@ -40,30 +40,18 @@ export const renderNovelDetail = async (ctx) => {
     });
 };
 
-// 4. 更新小说信息
+// 4. 更新小说信息 (包含 prompts)
 export const updateNovel = async (ctx) => {
     const { id } = ctx.params;
-    // [修复] 从 request.body 中解构出 prompts
     const { title, author, status, description, cover, prompts } = ctx.request.body;
     
-    // 构建更新对象
-    const updateData = { 
-        title, 
-        author, 
-        status, 
-        description, 
-        cover 
-    };
-
-    // [修复] 如果前端提交了 prompts (来自配置弹窗)，则将其合并入更新数据
-    // koa-bodyparser 会自动处理 name="prompts[script]" 这种表单格式为对象
+    const updateData = { title, author, status, description, cover };
+    
     if (prompts) {
         updateData.prompts = prompts;
     }
 
     await Novel.findByIdAndUpdate(id, updateData);
-    
-    // 保持重定向逻辑不变
     ctx.redirect(`/novel/${id}`);
 };
 
@@ -116,75 +104,129 @@ export const renderChapterDetail = async (ctx) => {
     });
 };
 
-// 9. [核心修改] 导入脚本 (适配您的 JSON 结构)
+// 9. 导入脚本 (importScript)
 export const importScript = async (ctx) => {
     const { id } = ctx.params;
     const { rawScript } = ctx.request.body;
 
-    const chapter = await Chapter.findById(id);
-    if (!chapter) {
-        ctx.status = 404;
+    // --- 1. 清洗 JSON 数据 ---
+    let jsonStr = "";
+    try {
+        const match = rawScript.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+        if (match) {
+            jsonStr = match[0];
+        } else {
+            throw new Error("无法找到 JSON 对象");
+        }
+    } catch (e) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: "JSON 格式提取失败" };
         return;
     }
 
     let parsedData;
     try {
-        parsedData = JSON.parse(rawScript);
+        parsedData = JSON.parse(jsonStr);
     } catch (e) {
-        ctx.body = "Error: Invalid JSON format";
+        ctx.status = 400;
+        ctx.body = { success: false, message: "JSON 解析错误: " + e.message };
         return;
     }
 
-    // --- 数据映射逻辑 ---
+    // --- 2. 数据映射 (按 Page 聚合 + Markdown 格式化) ---
     let flatPanels = [];
-    if (parsedData.pages && Array.isArray(parsedData.pages)) {
-        parsedData.pages.forEach(page => {
-            if (page.panels && Array.isArray(page.panels)) {
-                page.panels.forEach(p => {
-                    flatPanels.push({
-                        id: p.panel_id,
-                        // 映射您的 JSON 字段到 DB 字段
-                        visual: p.visual_description,  // 画面描述
-                        env: p.environment_details,    // 环境细节
-                        composition: p.shot_type,      // 景别
-                        lines: p.audio_elements ? p.audio_elements.map(a => ({
-                            role: a.speaker,
-                            content: a.text
-                        })) : []
+    try {
+        const pages = parsedData.pages || (Array.isArray(parsedData) ? parsedData : []);
+
+        if (pages.length > 0) {
+            pages.forEach((page, pIndex) => {
+                const pageNum = page.page_number || (pIndex + 1);
+                
+                // --- 构建显示用的 Markdown 文本 ---
+                let displayContent = `**P${pageNum}**\n\n`;
+                
+                // 处理 Panels
+                if (page.panels && Array.isArray(page.panels)) {
+                    page.panels.forEach(p => {
+                        const panelId = p.panel_id || "?";
+                        
+                        displayContent += `**Panel ${panelId}**\n`;
+                        displayContent += `* **景别：** ${p.shot_type || '未指定'}\n`;
+                        displayContent += `* **画面：** ${p.visual_description || '-'}\n`;
+                        
+                        if (p.environment_details) {
+                            displayContent += `* **环境细节：** ${p.environment_details}\n`;
+                        }
+
+                        // 处理音频/台词
+                        const audio = p.audio_elements || p.lines || [];
+                        audio.forEach(a => {
+                            const role = a.speaker || "声音";
+                            const text = a.text || "";
+                            displayContent += `* **${role}：** ${text}\n`;
+                        });
+
+                        displayContent += `\n`; // 每个 Panel 后空一行
                     });
+                } 
+                // 兼容逻辑 (无 Panels)
+                else {
+                    displayContent += `**Panel 1**\n`;
+                    displayContent += `* **画面：** ${page.visual_description || page.visual || '-'}\n`;
+                }
+
+                // 推入数组
+                flatPanels.push({
+                    id: String(pageNum),
+                    visual: displayContent,         // 前端显示用 + 复制到 Prompt 用
+                    env: "", 
+                    composition: "Whole Page",
+                    lines: [], 
+                    image_index: pIndex // 暂存原始索引，下面会修正为 +1
                 });
-            }
-        });
+            });
+        }
+    } catch (err) {
+        ctx.status = 500;
+        ctx.body = { success: false, message: "数据结构映射出错: " + err.message };
+        return;
     }
 
-    // 增加 image_index (0, 1, 2...)
+    // --- 3. 补充索引 (从 1 开始) ---
     flatPanels = flatPanels.map((panel, index) => ({
         ...panel,
-        image_index: index
+        image_index: index + 1 
     }));
 
-    // 自动创建目录
+    // --- 4. 自动创建目录 ---
+    const chapter = await Chapter.findById(id);
     const novelIdStr = chapter.novelId.toString();
     const epFolder = `ep${chapter.order}`; 
     const targetDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr, epFolder);
-
-    try {
-        if (!fs.existsSync(targetDir)) {
-            fs.mkdirSync(targetDir, { recursive: true });
-        }
-    } catch (err) {
-        console.error("❌ 创建目录失败:", err);
+    
+    if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    // 更新 DB
-    await Chapter.findByIdAndUpdate(id, {
-        script_data: flatPanels
-    });
+    // --- 5. 更新 DB ---
+    try {
+        const updatedChapter = await Chapter.findByIdAndUpdate(id, {
+            script_data: flatPanels
+        }, { new: true }); 
 
-    ctx.redirect(`/chapter/${id}`);
+        ctx.body = { 
+            success: true, 
+            message: `成功解析 ${flatPanels.length} 页脚本`,
+            data: updatedChapter.script_data 
+        };
+
+    } catch (dbErr) {
+        ctx.status = 500;
+        ctx.body = { success: false, message: "数据库保存失败" };
+    }
 };
 
-// 10. 获取单卡片 Prompt
+// 10. 获取单卡片 Prompt (已修复：使用 image 字段 + 模板替换)
 export const getPanelPrompt = async (ctx) => {
     const { id, panelId } = ctx.params; 
     const chapter = await Chapter.findById(id);
@@ -198,9 +240,24 @@ export const getPanelPrompt = async (ctx) => {
         return;
     }
 
-    // 使用 Novel 配置的 Image Prompt
-    const basePrompt = novel.prompts ? novel.prompts.image : "";
-    const result = buildImagePrompt(panel, basePrompt);
+    // 1. 获取卡片 Markdown 内容 (**P1**...)
+    const cardContent = panel.visual || "";
 
-    ctx.body = { success: true, data: result.positive };
+    // 2. 获取模板 (修正为 novel.prompts.image)
+    // 这是给 LLM 看的模板，例如: "请根据以下脚本生成 SD 提示词：\n{content}"
+    const template = (novel.prompts && novel.prompts.image) ? novel.prompts.image : "";
+
+    // 3. 拼接/替换
+    let finalOutput = cardContent;
+
+    if (template) {
+        if (template.includes("{content}")) {
+            finalOutput = template.replace(/{content}/g, cardContent);
+        } else {
+            // 兜底：如果模板没写 {content}，直接接在后面
+            finalOutput = template + "\n\n" + cardContent;
+        }
+    }
+
+    ctx.body = { success: true, data: finalOutput };
 };
