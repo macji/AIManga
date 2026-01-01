@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title><%= title %> - AIManga</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定义滚动条样式 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex overflow-hidden font-sans">
+
+    <aside class="w-64 bg-slate-900 text-white flex-shrink-0 flex flex-col transition-all duration-300">
+        <div class="h-16 flex items-center justify-center border-b border-slate-800">
+            <h1 class="text-xl font-bold tracking-wider text-blue-400">AIManga <span class="text-xs text-slate-500">v1.0</span></h1>
+        </div>
+        
+        <nav class="flex-1 overflow-y-auto py-4">
+            <ul class="space-y-1 px-2">
+                <li>
+                    <a href="/" class="flex items-center px-4 py-3 bg-blue-600 rounded-lg text-white shadow-md">
+                        <span class="mr-3">📚</span> 作品管理
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="flex items-center px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                        <span class="mr-3">🎨</span> 资产库 (待开发)
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="flex items-center px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                        <span class="mr-3">⚙️</span> 系统设置
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        
+        <div class="p-4 border-t border-slate-800">
+            <div class="flex items-center">
+                <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs">U</div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium">User</p>
+                    <p class="text-xs text-slate-500">Pro Plan</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-700"><%= title %></h2>
+            <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm">
+                + 新建项目
+            </button>
+        </header>
+
+        <div class="flex-1 overflow-auto p-8">
+            <%- body %>
+        </div>
+    </main>
+
+</body>
+</html>

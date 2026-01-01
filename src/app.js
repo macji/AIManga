@@ -1,0 +1,40 @@
+import Koa from 'koa';
+import views from 'koa-views';
+import serve from 'koa-static';
+import bodyParser from 'koa-bodyparser';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+// 引入数据库连接模块
+import { connectDB } from './config/db.js';
+import router from './routes/index.js';
+
+// 1. 初始化配置
+dotenv.config(); // 加载 .env 文件
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const app = new Koa();
+
+// 2. 连接数据库
+connectDB();
+
+// 3. 中间件配置
+app.use(bodyParser());
+app.use(serve(path.join(__dirname, '../public')));
+
+// [新增] 挂载生成的图片目录，访问路径为 /outputs/images/xxx.png
+app.use(serve(path.join(__dirname, '../assets/outputs')));
+
+// 配置 EJS 模板引擎
+app.use(views(path.join(__dirname, 'views'), {
+    extension: 'ejs'
+}));
+
+// 4. 挂载路由
+app.use(router.routes()).use(router.allowedMethods());
+
+// 5. 启动服务器
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 AIManga Server running at http://localhost:${PORT}`);
+});
