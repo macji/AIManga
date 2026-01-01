@@ -43,8 +43,27 @@ export const renderNovelDetail = async (ctx) => {
 // 4. 更新小说信息
 export const updateNovel = async (ctx) => {
     const { id } = ctx.params;
-    const { title, author, status, description, cover } = ctx.request.body;
-    await Novel.findByIdAndUpdate(id, { title, author, status, description, cover });
+    // [修复] 从 request.body 中解构出 prompts
+    const { title, author, status, description, cover, prompts } = ctx.request.body;
+    
+    // 构建更新对象
+    const updateData = { 
+        title, 
+        author, 
+        status, 
+        description, 
+        cover 
+    };
+
+    // [修复] 如果前端提交了 prompts (来自配置弹窗)，则将其合并入更新数据
+    // koa-bodyparser 会自动处理 name="prompts[script]" 这种表单格式为对象
+    if (prompts) {
+        updateData.prompts = prompts;
+    }
+
+    await Novel.findByIdAndUpdate(id, updateData);
+    
+    // 保持重定向逻辑不变
     ctx.redirect(`/novel/${id}`);
 };
 
