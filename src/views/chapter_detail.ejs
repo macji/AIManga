@@ -81,7 +81,6 @@
             </div>
 
             <div class="flex flex-col gap-4 overflow-hidden h-full">
-                
                 <div class="h-2/5 flex flex-col bg-slate-800 rounded-xl shadow-md border border-slate-700 overflow-hidden flex-shrink-0">
                     <div class="px-4 py-2 bg-slate-900/50 border-b border-slate-700 flex justify-between items-center flex-shrink-0">
                         <span class="text-xs font-bold text-purple-300">🚀 最终提示词 (复制 -> 去大模型生图)</span>
@@ -103,7 +102,7 @@
                     <div class="flex-1 bg-slate-100 relative group flex items-center justify-center overflow-hidden p-4">
                         <img :src="styleImage" 
                              class="max-w-full max-h-full object-contain shadow-md rounded border border-slate-200"
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
                         
                         <div class="absolute inset-0 flex-col items-center justify-center text-slate-400 hidden" style="display: none;">
                             <span class="text-5xl mb-3 opacity-20">🖼️</span>
@@ -119,11 +118,10 @@
              
              <div class="col-span-4 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 h-full overflow-hidden"
                  x-data="{ 
-                     rawScript: localStorage.getItem('aimanga_script_cache_<%= chapter._id %>') || '',
                      saveCache() { localStorage.setItem('aimanga_script_cache_<%= chapter._id %>', this.rawScript) }
                  }">
                 <div class="px-4 py-3 border-b border-slate-100 bg-blue-50/30 flex justify-between items-center flex-shrink-0">
-                    <span class="text-sm font-bold text-slate-700">📥 导入 JSON 脚本</span>
+                    <span class="text-sm font-bold text-slate-700">📥 导入 JSON/文本 脚本</span>
                     <button @click="importScript()" 
                         :disabled="isSubmitting"
                         class="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition shadow-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -135,12 +133,12 @@
                 <div class="flex-1 flex flex-col relative">
                      <textarea x-model="rawScript" @input="saveCache()" id="jsonInput" 
                         class="absolute inset-0 w-full h-full p-4 text-xs font-mono resize-none outline-none text-slate-600 bg-white border-0" 
-                        placeholder="在此粘贴 LLM 生成的 JSON 分镜脚本..."></textarea>
+                        placeholder="在此粘贴 LLM 生成的分镜脚本...&#10;&#10;支持格式：&#10;1. JSON 数组&#10;2. 文本格式 (例如: **Panel 1** 画面：...)"></textarea>
                      
-                     <div x-show="errorMsg" x-transition 
+                      <div x-show="errorMsg" x-transition 
                           class="absolute bottom-4 left-4 right-4 px-3 py-2 bg-red-100 text-red-700 text-xs rounded border border-red-200 shadow-sm flex items-center gap-2"
                           style="display: none;">
-                        <span>⚠️</span> <span x-text="errorMsg"></span>
+                         <span>⚠️</span> <span x-text="errorMsg"></span>
                      </div>
                 </div>
             </div>
@@ -152,7 +150,6 @@
                 </div>
 
                 <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                    
                     <div x-show="panels.length === 0" class="h-full flex flex-col items-center justify-center text-slate-400">
                         <div class="text-4xl mb-2 opacity-30">📭</div>
                         <p class="text-sm">暂无分镜数据</p>
@@ -174,7 +171,7 @@
                             <div class="w-full md:w-56 bg-slate-100 relative cursor-pointer group/img border-l border-slate-100" 
                                  @click="openImage(index)">
                                 <img :src="getImageUrl(index)" 
-                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
+                                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
                                      class="absolute inset-0 w-full h-full object-cover transition-transform group-hover/img:scale-105">
                                 
                                 <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-300 bg-slate-100 hidden" style="display: none;">
@@ -202,7 +199,7 @@
                 </p>
 
                 <button @click="
-                    processing = true; 
+                    processing = true;
                     logs = ['正在请求服务器处理...'];
                     fetch('/chapter/<%= chapter._id %>/split_images', { method: 'POST' })
                         .then(res => res.json())
@@ -235,11 +232,77 @@
             </div>
         </div>
         
-        <div x-show="activeTab === 'audio'" class="absolute inset-6 flex items-center justify-center bg-white border border-slate-200 rounded-xl border-dashed" style="display: none;">
-            <div class="text-center text-slate-400">
-                <div class="text-6xl mb-4 opacity-20">🗣️</div>
-                <h3 class="text-xl font-bold text-slate-600 mb-2">语音字幕制作</h3>
-                <p class="text-sm bg-slate-100 px-3 py-1 rounded-full inline-block">🚧 功能开发中...</p>
+        <div x-show="activeTab === 'audio'" class="absolute inset-6 grid grid-cols-2 gap-6 overflow-hidden" style="display: none;">
+            <div class="flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 h-full overflow-hidden"
+                 x-data="{ 
+                     saveAudioCache() { localStorage.setItem('aimanga_audio_cache_<%= chapter._id %>', this.audioScript) }
+                 }">
+                <div class="px-4 py-3 border-b border-slate-100 bg-emerald-50/50 flex justify-between items-center flex-shrink-0">
+                    <span class="text-sm font-bold text-emerald-900">📜 语音字幕脚本 (JSON)</span>
+                    <button @click="audioScript = ''" class="text-xs text-slate-400 hover:text-red-500">清空</button>
+                </div>
+                
+                <textarea 
+                    x-model="audioScript" 
+                    @input="saveAudioCache()"
+                    class="flex-1 w-full p-4 resize-none outline-none text-xs text-slate-600 font-mono bg-white leading-relaxed placeholder-slate-300" 
+                    placeholder='格式示例：&#10;{&#10;  "data": [&#10;    [ &#10;      [ {"key": "pangbai", "value": "台词..."} ] &#10;    ]&#10;  ]&#10;}'></textarea>
+            </div>
+
+            <div class="flex flex-col h-full gap-6">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4 flex-shrink-0">
+                    <h3 class="text-sm font-bold text-slate-700">🛠️ 操作面板</h3>
+                    
+                    <div class="flex gap-3">
+                        <button @click="copyAudioPrompt($el)" class="flex-1 py-3 bg-emerald-600 text-white rounded-lg font-bold shadow-md hover:bg-emerald-700 transition flex items-center justify-center gap-2">
+                            <span>📋</span> 复制提示词
+                        </button>
+                        
+                        <button @click="generateAudio()" 
+                                :disabled="isGeneratingAudio"
+                                :class="{'opacity-75 cursor-wait': isGeneratingAudio}"
+                                class="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-md hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                            <span x-show="!isGeneratingAudio">🗣️ 生成语音</span>
+                            <span x-show="isGeneratingAudio" class="flex items-center gap-2">
+                                <svg class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                生成中...
+                            </span>
+                        </button>
+                    </div>
+
+                    <p class="text-xs text-slate-400 leading-relaxed">
+                        ⚠️ 请确保本地 TTS 服务 (127.0.0.1:9880) 已启动，且参考音频位于 <code>assets/wav/</code> 目录。
+                    </p>
+                </div>
+
+                <div class="flex-1 bg-slate-50 rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+                     <div class="px-4 py-2 border-b border-slate-200 bg-white text-xs font-bold text-slate-500">
+                        生成结果列表
+                     </div>
+                     <div class="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-2">
+                        
+                        <div x-show="audioFiles.length === 0" class="h-full flex flex-col items-center justify-center text-slate-400">
+                             <div class="text-4xl mb-2 opacity-20">🎵</div>
+                             <p class="text-sm">暂无音频</p>
+                        </div>
+
+                        <template x-for="file in audioFiles" :key="file.filename">
+                            <div class="bg-white p-3 rounded border border-slate-200 flex items-center gap-3 shadow-sm">
+                                <div class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold font-mono">
+                                    wav
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-xs font-bold text-slate-700 truncate" x-text="file.filename"></div>
+                                    <audio controls :src="file.url" class="w-full h-6 mt-1" style="height: 24px;"></audio>
+                                </div>
+                                <a :href="file.url" download class="text-slate-400 hover:text-indigo-600 p-2">
+                                    ⬇️
+                                </a>
+                            </div>
+                        </template>
+
+                     </div>
+                </div>
             </div>
         </div>
 
@@ -268,7 +331,9 @@
             script: <%- JSON.stringify(novel.prompts && novel.prompts.script ? novel.prompts.script : "") %>,
             visual: <%- JSON.stringify(novel.prompts && novel.prompts.visual ? novel.prompts.visual : "") %>,
             image: <%- JSON.stringify(novel.prompts && novel.prompts.image ? novel.prompts.image : "") %>,
-            visual_setting: <%- JSON.stringify(novel.prompts && novel.prompts.visual_setting ? novel.prompts.visual_setting : "") %>
+            visual_setting: <%- JSON.stringify(novel.prompts && novel.prompts.visual_setting ? novel.prompts.visual_setting : "") %>,
+            // [New] Audio Prompt
+            audio: <%- JSON.stringify(novel.prompts && novel.prompts.audio ? novel.prompts.audio : "") %>
         }
     };
 
@@ -280,6 +345,11 @@
             styleImage: `/images/${window.CHAPTER_DATA.novelId}/ep${window.CHAPTER_DATA.chapterOrder}/style.png?t=` + Date.now(),
             
             rawScript: localStorage.getItem(`aimanga_script_cache_${window.CHAPTER_DATA.chapterId}`) || '',
+            // [New] Audio Script Cache
+            audioScript: localStorage.getItem(`aimanga_audio_cache_${window.CHAPTER_DATA.chapterId}`) || '',
+            isGeneratingAudio: false,
+            audioFiles: [],
+            
             isSaving: false,
             isUploading: false,
             isSubmitting: false,
@@ -359,7 +429,6 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ rawScript: this.rawScript }) 
                     });
-                    
                     const result = await res.json();
                     if (result.success) {
                         this.panels = result.data;
@@ -392,6 +461,77 @@
                     } else { btn.innerHTML = '❌'; }
                 } catch (e) { btn.innerHTML = '❌'; }
                 setTimeout(() => { btn.innerHTML = originalHtml; }, 1000);
+            },
+
+            // [New] 复制语音 Prompt + JSON
+            async copyAudioPrompt(btn) {
+                if (!this.rawScript) {
+                    alert('请先在“分镜制作”Tab 中输入分镜 JSON 或文本！');
+                    return;
+                }
+
+                // 1. 获取数据库配置的模板
+                let template = window.CHAPTER_DATA.prompts.audio;
+
+                // 2. 检查是否有配置，如果没有则给出提示或使用默认兜底
+                if (!template) {
+                    const useDefault = confirm("⚠️ 检测到未配置 [Audio Prompt]。\n是否使用默认模板？\n\n(建议稍后去“小说设置”里配置 Audio 字段)");
+                    if (!useDefault) return;
+
+                    template = `请根据以下分镜脚本数据，生成对应的语音/字幕 JSON 配置。\n要求：\n1. 提取每个 Panel 中的对话（lines）和旁白。\n2. 如果 Panel 中没有对话，则根据 visual_description 生成简短的旁白。\n3. 输出格式必须为标准 JSON 数组。\n\n分镜数据：\n{content}`;
+                }
+
+                // 3. 拼接内容
+                let fullPrompt = "";
+                if (template.includes("{content}")) {
+                    fullPrompt = template.replace(/{content}/g, this.rawScript);
+                } else {
+                    fullPrompt = template + "\n\n" + this.rawScript;
+                }
+                
+                // 4. 执行复制
+                const originalText = btn.innerHTML;
+                try {
+                    await navigator.clipboard.writeText(fullPrompt);
+                    btn.innerHTML = '✅ 已复制';
+                } catch (err) {
+                    console.error(err);
+                    btn.innerHTML = '❌ 失败';
+                    alert('复制失败，请检查浏览器权限');
+                }
+                setTimeout(() => btn.innerHTML = originalText, 1500);
+            },
+
+            // [New] 生成语音请求
+            async generateAudio() {
+                if (!this.audioScript.trim()) {
+                    alert("请先输入语音脚本 JSON");
+                    return;
+                }
+                
+                this.isGeneratingAudio = true;
+                this.audioFiles = []; // 清空列表
+
+                try {
+                    const res = await fetch(`/chapter/${window.CHAPTER_DATA.chapterId}/generate_audio`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ audioScript: this.audioScript })
+                    });
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        this.audioFiles = data.files; // 更新列表
+                        alert(data.message);
+                    } else {
+                        alert("生成失败: " + data.message);
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("网络请求错误");
+                } finally {
+                    this.isGeneratingAudio = false;
+                }
             }
         }));
     });

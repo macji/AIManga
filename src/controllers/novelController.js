@@ -3,6 +3,7 @@ import Chapter from '../models/Chapter.js';
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
+import axios from 'axios';
 
 // 1. 渲染小说列表页
 export const renderNovelList = async (ctx) => {
@@ -403,5 +404,186 @@ export const splitImages = async (ctx) => {
         console.error(err);
         ctx.status = 500;
         ctx.body = { success: false, message: "图片分割失败: " + err.message };
+    }
+};
+
+// ===================== TTS 工具函数与配置 =====================
+
+// 1. 合并 WAV Buffer
+const mergeWavBuffers = (buffers) => {
+    if (!buffers.length) return null;
+    const header = buffers[0].slice(0, 44);
+    const channels = header.readUInt16LE(22);
+    const sampleRate = header.readUInt32LE(24);
+    const bitsPerSample = header.readUInt16LE(34);
+    const dataParts = buffers.map(buf => buf.slice(44));
+
+    // 生成 0.5秒 静音
+    const SILENCE_DURATION = 0.5;
+    const bytesPerSecond = sampleRate * channels * (bitsPerSample / 8);
+    let silenceLength = Math.ceil(bytesPerSecond * SILENCE_DURATION);
+    if (silenceLength % 2 !== 0) silenceLength++;
+    const silenceBuffer = Buffer.alloc(silenceLength, 0);
+    dataParts.push(silenceBuffer);
+
+    const totalDataLength = dataParts.reduce((acc, part) => acc + part.length, 0);
+    header.writeUInt32LE(36 + totalDataLength, 4);
+    header.writeUInt32LE(totalDataLength, 40);
+
+    return Buffer.concat([header, ...dataParts]);
+};
+
+// 2. 角色映射 (基于 process.cwd())
+const getVoiceConfig = (key) => {
+    const BASE_WAV_PATH = path.join(process.cwd(), 'assets', 'wav');
+    
+    // 默认映射表
+    const VOICE_MAP = {
+        "pangbai": { file: "huahuo_jidong.wav", text: "连锁反应开始了！绿色的水泡炸裂，脓水溅射到旁边的丧尸身上，迅速腐蚀。" },
+        "xuangu": { file: "xuangu2.wav", text: "【默认】居勒什…应该在爷爷的卧室那边吧。他好像也很缅怀爷爷，但又不想当着我的面这样做。" },
+        "ada": { file: "ada.wav", text: "【默认】本来这是我们全镇人为老板准备的礼物，打算在做好之后再向你揭晓。" },
+        "xiaoliu": { file: "xiaoliu.wav", text: "【默认】它是基于人的生活诞生的美丽之物，每当有喜悦或值得庆祝的事，人们就会起舞。" },
+        "leilaohu": { file: "nisheng.wav", text: "【默认】居然是好奇这个吗？呵呵，那我再讲明白一点吧。" },
+        "liming": { file: "liming.wav", text: "【默认】本来这是我们全镇人为老板准备的礼物，打算在做好之后再向你揭晓。" },
+        "tufu": { file: "tufu.wav", text: "【默认】哈哈哈哈哈，甚好甚好！且让善龙一观你有无真材实料！" }
+    };
+
+    const config = VOICE_MAP[key];
+    if (!config) return null;
+
+    return {
+        ref_audio: path.join(BASE_WAV_PATH, config.file),
+        ref_text: config.text
+    };
+};
+
+// 3. 生成单句语音
+const generateSingleVoice = async (text, characterKey) => {
+    const config = getVoiceConfig(characterKey);
+    if (!config || !fs.existsSync(config.ref_audio)) return null;
+
+    const API_URL = "http://127.0.0.1:9880/tts";
+    const payload = {
+        text_lang: "zh",
+        prompt_lang: "zh",
+        text_split_method: "cut5",
+        batch_size: 1,
+        speed_factor: 1,
+        media_type: "wav",
+        streaming_mode: false,
+        parallel_infer: true,
+        repetition_penalty: 1.35,
+        temperature: 0.95,
+        Top_P: 0.95,
+        text: text,
+        ref_audio_path: config.ref_audio,
+        prompt_text: config.ref_text
+    };
+
+    try {
+        const { data } = await axios.post(API_URL, payload, { responseType: 'arraybuffer' });
+        return data;
+    } catch (err) {
+        console.error(`TTS API Error (${characterKey}):`, err.message);
+        return null;
+    }
+};
+
+// ===================== Controller Method =====================
+
+// 14. 生成语音 (Generate Audio)
+export const generateAudio = async (ctx) => {
+    const { id } = ctx.params;
+    const { audioScript } = ctx.request.body; // Expects JSON string or object
+
+    if (!audioScript) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: "语音脚本不能为空" };
+        return;
+    }
+
+    let scriptData;
+    try {
+        scriptData = typeof audioScript === 'string' ? JSON.parse(audioScript) : audioScript;
+        // 兼容处理：如果是 { data: [...] } 格式，取 .data，否则直接用
+        if (scriptData.data) scriptData = scriptData.data;
+    } catch (e) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: "JSON 解析失败" };
+        return;
+    }
+
+    try {
+        const chapter = await Chapter.findById(id);
+        const novelIdStr = chapter.novelId.toString();
+        const epFolder = `ep${chapter.order}`;
+        
+        // 输出目录: assets/outputs/images/:novelId/epX/audio
+        const outputDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr, epFolder, 'audio');
+        
+        if (fs.existsSync(outputDir)) {
+            fs.rmSync(outputDir, { recursive: true, force: true });
+        }
+        fs.mkdirSync(outputDir, { recursive: true });
+
+        const generatedFiles = [];
+
+        // 遍历结构: Page -> Shot (Panel) -> Lines
+        // scriptData 应该是 Array<Array<Array<{key, value}>>> 或者是 Array<Array<{key, value}>> (兼容性)
+        
+        let totalCount = 0;
+
+        // 递归处理或者按层级处理。根据你提供的 SCRIPT_JSON 结构：
+        // data[pageIndex][shotIndex][lineIndex]
+        
+        if (!Array.isArray(scriptData)) throw new Error("脚本格式错误，应为数组");
+
+        for (const [pageIndex, pageShots] of scriptData.entries()) {
+            if (!Array.isArray(pageShots)) continue;
+
+            // 判断是否是单镜头页 (可选逻辑，根据你的需求)
+            const isSingleShotPage = pageShots.length === 1;
+
+            for (const [shotIndex, shotLines] of pageShots.entries()) {
+                if (!Array.isArray(shotLines)) continue;
+
+                // 命名: 0-1.wav (第0页-第1镜) 或 0.wav
+                // 为了前端排序方便，建议统一用 P-S 格式，或者如果只有1镜就是 P.wav
+                let filename = isSingleShotPage ? `${pageIndex + 1}.wav` : `${pageIndex + 1}-${shotIndex + 1}.wav`;
+                
+                const shotBuffers = [];
+                for (const line of shotLines) {
+                    if (line.key && line.value) {
+                        const audioBuffer = await generateSingleVoice(line.value, line.key);
+                        if (audioBuffer) shotBuffers.push(audioBuffer);
+                    }
+                }
+
+                if (shotBuffers.length > 0) {
+                    const mergedBuffer = mergeWavBuffers(shotBuffers);
+                    if (mergedBuffer) {
+                        const filePath = path.join(outputDir, filename);
+                        fs.writeFileSync(filePath, mergedBuffer);
+                        
+                        generatedFiles.push({
+                            filename: filename,
+                            url: `/images/${novelIdStr}/${epFolder}/audio/${filename}`
+                        });
+                        totalCount++;
+                    }
+                }
+            }
+        }
+
+        ctx.body = { 
+            success: true, 
+            message: `成功生成 ${totalCount} 段音频`,
+            files: generatedFiles
+        };
+
+    } catch (err) {
+        console.error(err);
+        ctx.status = 500;
+        ctx.body = { success: false, message: "生成失败: " + err.message };
     }
 };

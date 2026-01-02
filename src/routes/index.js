@@ -24,5 +24,6 @@ router.post('/chapter/:id/save_setting_text', novelController.saveVisualSettingT
 router.post('/chapter/:id/upload_style', novelController.uploadStyleImage);
 
 router.post('/chapter/:id/split_images', novelController.splitImages);
+router.post('/chapter/:id/generate_audio', novelController.generateAudio);
 
 export default router;
