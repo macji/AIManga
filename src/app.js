@@ -19,7 +19,6 @@ const app = new Koa();
 connectDB();
 
 // 3. 中间件配置
-app.use(bodyParser());
 app.use(serve(path.join(__dirname, '../public')));
 app.use(bodyParser({
     enableTypes: ['json', 'form', 'text'],
@@ -28,6 +27,7 @@ app.use(bodyParser({
     textLimit: '50mb',
     xmlLimit: '50mb'
 }));
+app.use(bodyParser());
 
 // [新增] 挂载生成的图片目录，访问路径为 /outputs/images/xxx.png
 app.use(serve(path.join(__dirname, '../assets/outputs')));
