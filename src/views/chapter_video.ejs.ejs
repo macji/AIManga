@@ -1,0 +1,25 @@
+<%- include('partials/header') %>
+
+<div class="flex h-[calc(100vh-64px)] overflow-hidden bg-slate-50">
+    <%- include('partials/chapter_sidebar') %>
+
+    <div class="flex-1 flex flex-col min-w-0 bg-white relative">
+        <div class="px-8 py-4 border-b border-slate-100 flex justify-between items-center bg-white flex-shrink-0 h-16">
+            <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                <span>🎥</span> <span>视频生成</span>
+            </h2>
+        </div>
+
+        <div class="flex-1 overflow-hidden relative bg-slate-50/30">
+            <div class="absolute inset-0 flex items-center justify-center bg-white">
+                <div class="text-center text-slate-400">
+                    <div class="text-6xl mb-4 opacity-20">🎥</div>
+                    <h3 class="text-xl font-bold text-slate-600 mb-2">视频生成</h3>
+                    <p class="text-sm bg-slate-100 px-3 py-1 rounded-full inline-block">🚧 功能开发中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/footer') %>

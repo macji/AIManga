@@ -10,10 +10,7 @@ export const renderNovelList = async (ctx) => {
     const novels = await Novel.find().sort({ createdAt: -1 });
     await ctx.render('novel_list', { 
         title: '我的作品库', 
-        novels: novels,
-        breadcrumbs: [
-            { label: '作品库', href: null }
-        ]
+        novels: novels
     });
 };
 
@@ -33,11 +30,18 @@ export const renderNovelDetail = async (ctx) => {
     await ctx.render('novel_detail', { 
         title: novel.title, 
         novel, 
-        chapters,
-        breadcrumbs: [
-            { label: '作品库', href: '/' },
-            { label: novel.title, href: null }
-        ]
+        chapters
+    });
+};
+
+// [新增] 渲染提示词配置页
+export const renderNovelPrompts = async (ctx) => {
+    const { id } = ctx.params;
+    const novel = await Novel.findById(id);
+    
+    await ctx.render('novel_prompts', { 
+        title: `${novel.title} - 提示词配置`, 
+        novel
     });
 };
 
@@ -59,7 +63,12 @@ export const updateNovel = async (ctx) => {
     }
 
     await Novel.findByIdAndUpdate(id, updateData);
-    ctx.redirect(`/novel/${id}`);
+    
+    // 如果是从配置页提交的，通常包含 prompts 字段，保存后留在当前配置页或返回详情页
+    // 这里为了体验流畅，如果是 update 接口通用的，我们判断一下来源
+    // 简单处理：统一跳回详情页，或者根据 Referer 跳转
+    const referer = ctx.request.header.referer || `/novel/${id}`;
+    ctx.redirect(referer);
 };
 
 // 5. 添加章节
@@ -93,21 +102,50 @@ export const deleteChapter = async (ctx) => {
     }
 };
 
-// 8. 渲染章节详情页
-export const renderChapterDetail = async (ctx) => {
+// [重构] 8. 章节详情页重定向
+export const redirectChapterDetail = async (ctx) => {
     const { id } = ctx.params;
+    ctx.redirect(`/chapter/${id}/script`);
+};
+
+// [重构] 8.1 渲染章节具体 Tab 页面
+export const renderChapterPage = async (ctx) => {
+    const { id } = ctx.params;
+    
+    // 从 URL 路径获取当前 Tab
+    const pathParts = ctx.path.split('/');
+    const currentTab = pathParts[pathParts.length - 1]; 
+
     const chapter = await Chapter.findById(id);
+    if (!chapter) return ctx.redirect('/');
+
     const novel = await Novel.findById(chapter.novelId);
     
-    await ctx.render('chapter_detail', { 
-        title: `${chapter.title} - ${novel.title}`, 
+    // 视图映射表
+    const viewMap = {
+        'script': 'chapter_script',
+        'setting': 'chapter_setting',
+        'panels': 'chapter_panels',
+        'split': 'chapter_split',
+        'audio': 'chapter_audio',
+        'video': 'chapter_video'
+    };
+
+    const tabNameMap = {
+        'script': '提示词生成',
+        'setting': '视觉设定',
+        'panels': '分镜制作',
+        'split': '图片分割',
+        'audio': '语音字幕',
+        'video': '视频生成'
+    };
+
+    // 渲染对应的独立模板
+    await ctx.render(viewMap[currentTab] || 'chapter_script', { 
+        title: `${chapter.title} - ${tabNameMap[currentTab] || '制作'}`, 
         chapter, 
         novel,
-        breadcrumbs: [
-            { label: '作品库', href: '/' },
-            { label: novel.title, href: `/novel/${novel._id}` },
-            { label: chapter.title, href: null }
-        ]
+        activeTab: currentTab
     });
 };
 
@@ -116,109 +154,105 @@ export const importScript = async (ctx) => {
     const { id } = ctx.params;
     const { rawScript } = ctx.request.body;
 
+    console.log(`[ImportScript] Start processing for chapter: ${id}`);
+
+    // 1. 提取 JSON
     let jsonStr = "";
     try {
         const match = rawScript.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-        if (match) {
-            jsonStr = match[0];
-        } else {
-            throw new Error("无法找到 JSON 对象");
-        }
+        jsonStr = match ? match[0] : rawScript;
     } catch (e) {
         ctx.status = 400;
-        ctx.body = { success: false, message: "JSON 格式提取失败" };
+        ctx.body = { success: false, message: "无法提取 JSON" };
         return;
     }
 
+    // 2. 解析 JSON
     let parsedData;
     try {
         parsedData = JSON.parse(jsonStr);
     } catch (e) {
         ctx.status = 400;
-        ctx.body = { success: false, message: "JSON 解析错误: " + e.message };
+        ctx.body = { success: false, message: "JSON 格式错误: " + e.message };
         return;
     }
 
-    let flatPanels = [];
+    // 3. 数据映射
+    let pageCards = [];
+    let imageIndexCounter = 1;
+
     try {
-        const pages = parsedData.pages || (Array.isArray(parsedData) ? parsedData : []);
+        // 兼容处理：支持 { pages: [...] } 或直接 [...]
+        const pages = Array.isArray(parsedData) ? parsedData : (parsedData.pages || []);
 
-        if (pages.length > 0) {
-            pages.forEach((page, pIndex) => {
-                const pageNum = page.page_number || (pIndex + 1);
-                
-                let displayContent = `**P${pageNum}**\n\n`;
-                
-                if (page.panels && Array.isArray(page.panels)) {
-                    page.panels.forEach(p => {
-                        const panelId = p.panel_id || "?";
-                        displayContent += `**Panel ${panelId}**\n`;
-                        displayContent += `* **景别：** ${p.shot_type || '未指定'}\n`;
-                        displayContent += `* **画面：** ${p.visual_description || '-'}\n`;
-                        
-                        if (p.environment_details) {
-                            displayContent += `* **环境细节：** ${p.environment_details}\n`;
-                        }
-
-                        const audio = p.audio_elements || p.lines || [];
-                        audio.forEach(a => {
-                            const role = a.speaker || "声音";
-                            const text = a.text || "";
-                            displayContent += `* **${role}：** ${text}\n`;
-                        });
-
-                        displayContent += `\n`; 
-                    });
-                } 
-                else {
-                    displayContent += `**Panel 1**\n`;
-                    displayContent += `* **画面：** ${page.visual_description || page.visual || '-'}\n`;
-                }
-
-                flatPanels.push({
-                    id: String(pageNum),
-                    visual: displayContent,         
-                    env: "", 
-                    composition: "Whole Page",
-                    lines: [], 
-                    image_index: pIndex // 暂存
-                });
-            });
+        if (pages.length === 0) {
+            throw new Error("JSON 中未找到 pages 数组数据");
         }
+
+        pages.forEach((page) => {
+            const pageNum = page.page_number || imageIndexCounter;
+            
+            // --- A. 提取该页所有音频/对话 (用于语音生成) ---
+            // 我们把这一页里所有 Panel 的对话聚合起来，存入 lines
+            const linesData = []; 
+            if (page.panels && Array.isArray(page.panels)) {
+                page.panels.forEach(p => {
+                    const audios = p.audio_elements || [];
+                    audios.forEach(a => {
+                        if (['dialogue', 'thought'].includes(a.type)) {
+                            linesData.push({
+                                role: a.speaker,
+                                content: a.text
+                            });
+                        }
+                    });
+                });
+            }
+
+            // --- B. 构建 Visual 内容 (核心修改：整页 JSON) ---
+            // 直接将 page 对象转为 JSON 字符串
+            const pageJsonStr = JSON.stringify(page, null, 2);
+
+            // --- C. 构建最终数据库对象 ---
+            // 这里一个 item 代表一个 "Page" 而不是 "Panel"
+            pageCards.push({
+                id: String(pageNum),        // 显示为 Page 1
+                visual: pageJsonStr,        // 内容为整页 JSON
+                prompt_visual: "", 
+                env: "",                    // 页级环境描述比较少见，留空或提取 layout_note
+                composition: page.layout_note || "", // 将布局备注放入 composition
+                lines: linesData,           // 该页所有对话
+                image_index: imageIndexCounter++ // 对应 1.png, 2.png...
+            });
+        });
+
     } catch (err) {
+        console.error("[ImportScript] Mapping Error:", err);
         ctx.status = 500;
-        ctx.body = { success: false, message: "数据结构映射出错: " + err.message };
+        ctx.body = { success: false, message: "解析逻辑出错: " + err.message };
         return;
     }
 
-    flatPanels = flatPanels.map((panel, index) => ({
-        ...panel,
-        image_index: index + 1 
-    }));
-
-    const chapter = await Chapter.findById(id);
-    const novelIdStr = chapter.novelId.toString();
-    const epFolder = `ep${chapter.order}`; 
-    const targetDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr, epFolder);
-    
-    if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
-    }
-
+    // 4. 保存数据库
     try {
+        console.log(`[ImportScript] Saving ${pageCards.length} pages...`);
+        
         const updatedChapter = await Chapter.findByIdAndUpdate(id, {
-            script_data: flatPanels
-        }, { new: true }); 
+            script_data: pageCards
+        }, { new: true, runValidators: true });
+
+        if (!updatedChapter) throw new Error("章节不存在");
 
         ctx.body = { 
             success: true, 
-            message: `成功解析 ${flatPanels.length} 页脚本`,
+            message: `成功导入 ${pageCards.length} 页脚本`,
             data: updatedChapter.script_data 
         };
 
     } catch (dbErr) {
+        console.error("[ImportScript] DB Error:", dbErr);
         ctx.status = 500;
-        ctx.body = { success: false, message: "数据库保存失败" };
+        ctx.body = { success: false, message: "数据库保存失败: " + dbErr.message };
     }
 };
 

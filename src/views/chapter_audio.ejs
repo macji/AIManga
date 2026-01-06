@@ -1,0 +1,127 @@
+<%- include('partials/header') %>
+
+<script>
+    window.CHAPTER_DATA = {
+        novelId: "<%= novel._id %>",
+        chapterId: "<%= chapter._id %>",
+        chapterOrder: "<%= chapter.order %>",
+        prompts: {
+            audio: <%- JSON.stringify(novel.prompts && novel.prompts.audio ? novel.prompts.audio : "") %>
+        }
+    };
+</script>
+
+<div class="flex h-[calc(100vh-64px)] overflow-hidden bg-slate-50" x-data="audioApp()">
+    <%- include('partials/chapter_sidebar') %>
+
+    <div class="flex-1 flex flex-col min-w-0 bg-white relative">
+        <div class="px-8 py-4 border-b border-slate-100 flex justify-between items-center bg-white flex-shrink-0 h-16">
+            <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                <span>🗣️</span> <span>语音字幕</span>
+            </h2>
+            <div class="flex items-center gap-4">
+                <a href="/novel/<%= novel._id %>/prompts?tab=audio" target="_blank" class="text-xs font-medium text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-200 transition flex items-center gap-1.5 group">
+                    <span class="group-hover:rotate-45 transition-transform duration-300">⚙️</span> 配置提示词模版
+                </a>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-hidden relative bg-slate-50/30">
+            <div class="absolute inset-0 p-6 grid grid-cols-2 gap-6 overflow-hidden">
+                <div class="flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 h-full overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 bg-emerald-50/50 flex justify-between items-center flex-shrink-0">
+                        <span class="text-sm font-bold text-emerald-900">📜 语音字幕脚本 (JSON)</span>
+                        <button @click="audioScript = ''" class="text-xs text-slate-400 hover:text-red-500">清空</button>
+                    </div>
+                    <textarea x-model="audioScript" @input="saveAudioCache()" class="flex-1 w-full p-4 resize-none outline-none text-xs text-slate-600 font-mono bg-white leading-relaxed placeholder-slate-300 custom-scrollbar" placeholder='格式示例：&#10;{ "data": [ ... ] }'></textarea>
+                </div>
+
+                <div class="flex flex-col h-full gap-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4 flex-shrink-0">
+                        <h3 class="text-sm font-bold text-slate-700">🛠️ 操作面板</h3>
+                        <div class="flex gap-3">
+                            <button @click="copyAudioPrompt($el)" class="flex-1 py-3 bg-emerald-600 text-white rounded-lg font-bold shadow-md hover:bg-emerald-700 transition flex items-center justify-center gap-2"><span>📋</span> 复制提示词</button>
+                            <button @click="generateAudio()" :disabled="isGeneratingAudio" :class="{'opacity-75 cursor-wait': isGeneratingAudio}" class="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-md hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                                <span x-show="!isGeneratingAudio">🗣️ 生成语音</span>
+                                <span x-show="isGeneratingAudio">生成中...</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex-1 bg-slate-50 rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+                        <div class="px-4 py-2 border-b border-slate-200 bg-white text-xs font-bold text-slate-500">生成结果列表</div>
+                        <div class="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-2">
+                            <div x-show="audioFiles.length === 0" class="h-full flex flex-col items-center justify-center text-slate-400">
+                                <div class="text-4xl mb-2 opacity-20">🎵</div>
+                                <p class="text-sm">暂无音频</p>
+                            </div>
+                            <template x-for="file in audioFiles" :key="file.filename">
+                                <div class="bg-white p-3 rounded border border-slate-200 flex items-center gap-3 shadow-sm">
+                                    <div class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold font-mono">wav</div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-xs font-bold text-slate-700 truncate" x-text="file.filename"></div>
+                                        <audio controls :src="file.url" class="w-full h-6 mt-1" style="height: 24px;"></audio>
+                                    </div>
+                                    <a :href="file.url" download class="text-slate-400 hover:text-indigo-600 p-2">⬇️</a>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="//unpkg.com/alpinejs" defer></script>
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('audioApp', () => ({
+            audioScript: localStorage.getItem(`aimanga_audio_cache_${window.CHAPTER_DATA.chapterId}`) || '',
+            isGeneratingAudio: false,
+            audioFiles: [],
+
+            saveAudioCache() { 
+                localStorage.setItem(`aimanga_audio_cache_${window.CHAPTER_DATA.chapterId}`, this.audioScript) 
+            },
+
+            async copyAudioPrompt(btn) {
+                // 简化版：通常这里应该获取 rawScript，但由于拆分了文件，无法直接获取 panels 里的 rawScript
+                // 实际生产中建议使用 localStorage 跨页面通信或再次请求 API
+                const rawScript = localStorage.getItem(`aimanga_script_cache_${window.CHAPTER_DATA.chapterId}`);
+                if (!rawScript) { alert('请先在“分镜制作”Tab 中输入并保存分镜脚本！'); return; }
+
+                let template = window.CHAPTER_DATA.prompts.audio;
+                if (!template) {
+                    template = `请根据以下分镜脚本数据，生成对应的语音/字幕 JSON 配置。\n要求：\n1. 提取每个 Panel 中的对话（lines）和旁白。\n2. 输出格式必须为标准 JSON 数组。\n\n分镜数据：\n{content}`;
+                }
+                let fullPrompt = template.includes("{content}") ? template.replace(/{content}/g, rawScript) : (template + "\n\n" + rawScript);
+                
+                const originalText = btn.innerHTML;
+                try {
+                    await navigator.clipboard.writeText(fullPrompt);
+                    btn.innerHTML = '✅ 已复制';
+                } catch (err) { btn.innerHTML = '❌ 失败'; }
+                setTimeout(() => btn.innerHTML = originalText, 1500);
+            },
+
+            async generateAudio() {
+                if (!this.audioScript.trim()) { alert("请先输入语音脚本 JSON"); return; }
+                this.isGeneratingAudio = true;
+                this.audioFiles = [];
+                try {
+                    const res = await fetch(`/chapter/${window.CHAPTER_DATA.chapterId}/generate_audio`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ audioScript: this.audioScript })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.audioFiles = data.files;
+                        alert(data.message);
+                    } else { alert("生成失败: " + data.message); }
+                } catch (e) { alert("网络请求错误"); } finally { this.isGeneratingAudio = false; }
+            }
+        }));
+    });
+</script>
+<%- include('partials/footer') %>
