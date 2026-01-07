@@ -338,7 +338,8 @@ export const uploadStyleImage = async (ctx) => {
     }
 };
 
-// 13. [核心更新] 图片分割逻辑 (Split Images)
+// [重构] 13. 图片导出逻辑 (Export Images with Watermark)
+// 功能：读取章节目录下所有图片 -> 缩放至宽1600 -> 右下角合成小说Logo -> 存入 ext 目录
 export const splitImages = async (ctx) => {
     const { id } = ctx.params;
 
@@ -349,95 +350,108 @@ export const splitImages = async (ctx) => {
         const novelIdStr = chapter.novelId.toString();
         const epFolder = `ep${chapter.order}`; 
         
-        // 源目录: assets/outputs/images/novelId/epX
-        const sourceDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr, epFolder);
-        // 目标目录: sourceDir/ext
-        const targetDir = path.join(sourceDir, 'ext');
+        // 路径配置
+        const baseDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr);
+        const sourceDir = path.join(baseDir, epFolder); // 输入目录: .../epX
+        const targetDir = path.join(sourceDir, 'ext');  // 输出目录: .../epX/ext
+        const logoPath = path.join(baseDir, 'logo.png'); // Logo路径: .../novelId/logo.png
 
+        // 1. 检查源目录
         if (!fs.existsSync(sourceDir)) {
-            throw new Error("图片目录不存在，请先生成图片");
+            throw new Error("图片目录不存在，请先在分镜页面上传图片");
         }
 
-        // [新增] 每次处理前清空 ext 目录，确保无残留
+        // 2. 准备输出目录 (清空旧数据)
         if (fs.existsSync(targetDir)) {
-            // recursive: true 删除目录及其内容, force: true 忽略不存在的情况
             fs.rmSync(targetDir, { recursive: true, force: true });
         }
-        // 重新创建 ext 目录
         fs.mkdirSync(targetDir, { recursive: true });
 
-        // 读取所有 png 文件 (排除 style.png)
-        const files = fs.readdirSync(sourceDir).filter(file => file.endsWith('.png') && file !== 'style.png');
-
-        if (files.length === 0) {
-            throw new Error("当前目录下没有可处理的 PNG 图片");
-        }
-
-        // [步骤 1] 扫描找出最大的数值 x (不包含 99)
-        let maxIndex = 0;
-        files.forEach(file => {
-            const name = path.parse(file).name; // 文件名 (不含后缀)
-            const num = parseInt(name, 10);
-            if (!isNaN(num) && num !== 99) {
-                if (num > maxIndex) maxIndex = num;
-            }
+        // 3. 读取所有待处理图片 (排除 style.png, logo.png 和文件夹)
+        const files = fs.readdirSync(sourceDir).filter(file => {
+            const filePath = path.join(sourceDir, file);
+            if (fs.statSync(filePath).isDirectory()) return false; // 排除 ext 文件夹本身
+            
+            const lower = file.toLowerCase();
+            return (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg')) 
+                   && file !== 'style.png' 
+                   && file !== 'logo.png';
         });
 
+        if (files.length === 0) {
+            throw new Error("当前目录下没有可处理的图片文件");
+        }
+
+        // 4. 获取 Logo 信息 (如果存在)
+        let logoMetadata = null;
+        let hasLogo = false;
+        if (fs.existsSync(logoPath)) {
+            try {
+                logoMetadata = await sharp(logoPath).metadata();
+                hasLogo = true;
+            } catch (e) {
+                console.warn("读取 Logo 失败，将仅执行缩放:", e.message);
+            }
+        }
+
+        // 5. 批量处理
         let processedCount = 0;
+        
+        // 自然排序文件名 (1.png, 2.png, ... 10.png)
+        files.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-        // [步骤 2] 并行处理
         await Promise.all(files.map(async (file) => {
-            const fileName = path.parse(file).name;
-            const inputPath = path.join(sourceDir, file);
+            const fileName = file;
+            const inputPath = path.join(sourceDir, fileName);
+            // 输出文件名统一为 .jpg
+            const outputName = path.parse(fileName).name + '.jpg';
+            const outputPath = path.join(targetDir, outputName);
 
-            // 情况 A: 封面 0.png -> ext/0.jpg
-            if (fileName === '0') {
-                const outputPath = path.join(targetDir, '0.jpg');
-                await sharp(inputPath)
-                    .jpeg({ quality: 100 })
-                    .toFile(outputPath);
-            } 
-            // 情况 B: 封底 99.png -> ext/(x+1).jpg
-            else if (fileName === '99') {
-                const newName = `${maxIndex + 1}.jpg`;
-                const outputPath = path.join(targetDir, newName);
-                await sharp(inputPath)
-                    .jpeg({ quality: 100 })
-                    .toFile(outputPath);
-            } 
-            // 情况 C: 普通图片 -> 4分割 -> ext/x-1.jpg ...
-            else {
-                // 定义 4 个区域 (总尺寸 1792x2400 -> 子尺寸 896x1200)
-                const width = 896;
-                const height = 1200;
+            try {
+                // 步骤 A: 缩放底图 (固定宽度 1600)
+                const resizeChain = sharp(inputPath).resize({ width: 1600 });
                 
-                const regions = [
-                    { left: 0, top: 0, suffix: '-1' },     // 左上
-                    { left: width, top: 0, suffix: '-2' }, // 右上
-                    { left: 0, top: height, suffix: '-3' },// 左下
-                    { left: width, top: height, suffix: '-4' } // 右下
-                ];
+                // 如果需要合成 Logo，必须先获取缩放后的 Buffer 和 信息
+                if (hasLogo && logoMetadata) {
+                    const { data: bufferA, info: infoA } = await resizeChain.toBuffer({ resolveWithObject: true });
 
-                for (const region of regions) {
-                    const outputPath = path.join(targetDir, `${fileName}${region.suffix}.jpg`);
-                    await sharp(inputPath)
-                        .extract({ left: region.left, top: region.top, width: width, height: height })
-                        .jpeg({ quality: 100 })
+                    // 计算 Logo 位置 (右下角)
+                    const left = infoA.width - logoMetadata.width;
+                    const top = infoA.height - logoMetadata.height;
+
+                    // 步骤 B: 合成
+                    await sharp(bufferA)
+                        .composite([{
+                            input: logoPath,
+                            top: top >= 0 ? top : 0,
+                            left: left >= 0 ? left : 0
+                        }])
+                        .jpeg({ quality: 90, mozjpeg: true })
+                        .toFile(outputPath);
+                } else {
+                    // 没有 Logo，直接保存缩放后的图
+                    await resizeChain
+                        .jpeg({ quality: 90, mozjpeg: true })
                         .toFile(outputPath);
                 }
+                
+                processedCount++;
+            } catch (imgErr) {
+                console.error(`处理图片 ${fileName} 失败:`, imgErr);
+                // 不中断整体流程，继续下一张
             }
-            processedCount++;
         }));
 
-        ctx.body = { 
-            success: true, 
-            message: `处理完成！已先清空 ext 目录，共处理 ${processedCount} 张原图。` 
-        };
+        const msg = hasLogo 
+            ? `处理完成！已合成水印，共导出 ${processedCount} 张图片。` 
+            : `处理完成！未找到 Logo，仅执行缩放导出，共 ${processedCount} 张。`;
+
+        ctx.body = { success: true, message: msg };
 
     } catch (err) {
         console.error(err);
         ctx.status = 500;
-        ctx.body = { success: false, message: "图片分割失败: " + err.message };
+        ctx.body = { success: false, message: "导出失败: " + err.message };
     }
 };
 
