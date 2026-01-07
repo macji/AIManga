@@ -33,5 +33,10 @@ router.post('/chapter/:id/save_setting_text', novelController.saveVisualSettingT
 router.post('/chapter/:id/upload_style', novelController.uploadStyleImage);
 router.post('/chapter/:id/split_images', novelController.splitImages);
 router.post('/chapter/:id/generate_audio', novelController.generateAudio);
+// [新增] 小说 Logo 上传
+router.post('/novel/:id/upload_logo', novelController.uploadNovelLogo);
+
+// [新增] 上传页面图片
+router.post('/chapter/:id/upload_page_image', novelController.uploadPageImage); 
 
 export default router;

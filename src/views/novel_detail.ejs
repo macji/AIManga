@@ -1,11 +1,6 @@
 <%- include('partials/header') %>
 
-<div class="max-w-6xl mx-auto px-4 mt-8" x-data="{ 
-    showEditInfo: false,
-    showCreateChapter: false,
-    showEditChapter: false,
-    editData: { id: '', title: '', order: '', content: '' }
-}">
+<div class="max-w-6xl mx-auto px-4 mt-8" x-data="novelDetailApp()">
     
     <div class="mb-4">
         <a href="/" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-indigo-600 transition-colors group">
@@ -15,19 +10,23 @@
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-8 mb-8 flex gap-8 items-start">
-        <div class="w-40 h-56 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex-shrink-0 flex items-center justify-center text-5xl shadow-inner text-slate-400 font-serif select-none">
-            <%= novel.title.substring(0,1) %>
-        </div>
+        <div class="w-40 h-56 bg-slate-100 rounded-lg flex-shrink-0 flex items-center justify-center shadow-inner overflow-hidden relative border border-slate-200">
+            <div class="text-5xl text-slate-400 font-serif select-none absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                <%= novel.title.substring(0,1) %>
+            </div>
+            <img :src="logoUrl" 
+                 class="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300"
+                 onerror="this.style.opacity='0'"
+                 onload="this.style.opacity='1'"
+                 style="opacity: 0;"> </div>
         
         <div class="flex-1 min-w-0 py-2">
             <div class="flex justify-between items-start">
                 <div>
                     <h1 class="text-3xl font-bold text-slate-800 mb-3"><%= novel.title %></h1>
                     <div class="flex flex-wrap gap-4 text-sm text-slate-500 mb-6">
-                        <span class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full <%= novel.status === 'completed' ?
-                        'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700' %> font-medium text-xs">
-                            <span class="w-1.5 h-1.5 rounded-full <%= novel.status === 'completed' ?
-                            'bg-green-500' : 'bg-blue-500' %>"></span>
+                        <span class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full <%= novel.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700' %> font-medium text-xs">
+                            <span class="w-1.5 h-1.5 rounded-full <%= novel.status === 'completed' ? 'bg-green-500' : 'bg-blue-500' %>"></span>
                             <%= novel.status === 'completed' ? '已完结' : '连载中' %>
                         </span>
                         <span class="flex items-center gap-1">👤 <%= novel.author || '未知作者' %></span>
@@ -177,6 +176,33 @@
             
             <form action="/novel/<%= novel._id %>/update" method="POST" class="flex-1 overflow-y-auto">
                 <div class="p-6 space-y-4">
+                    
+                    <div class="mb-6 pb-6 border-b border-slate-100">
+                        <label class="block text-sm font-bold text-slate-700 mb-2">作品 Logo / 封面</label>
+                        <div class="flex items-center gap-4">
+                            <div class="w-20 h-28 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden relative flex-shrink-0">
+                                <img :src="logoUrl" class="w-full h-full object-cover" 
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
+                                     onload="this.style.display='block'; this.nextElementSibling.style.display='none'">
+                                <div class="absolute inset-0 flex items-center justify-center text-slate-300 bg-slate-50" style="display: none;">
+                                    <span class="text-2xl">?</span>
+                                </div>
+                                <div x-show="isUploadingLogo" class="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
+                                    <span class="animate-spin text-blue-600">⏳</span>
+                                </div>
+                            </div>
+
+                            <div class="flex-1">
+                                <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 hover:border-blue-500 hover:text-blue-600 transition shadow-sm group">
+                                    <span class="group-hover:text-blue-600">📤</span>
+                                    <span>上传图片</span>
+                                    <input type="file" class="hidden" accept="image/*" @change="uploadLogo($event)">
+                                </label>
+                                <p class="text-xs text-slate-400 mt-2">建议尺寸: 300x400 或 3:4 比例<br>将保存为 logo.png</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4">
                         <div><label class="block text-sm font-medium text-slate-700 mb-1">作品名称</label><input type="text" name="title" value="<%= novel.title %>" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
                         <div><label class="block text-sm font-medium text-slate-700 mb-1">作者</label><input type="text" name="author" value="<%= novel.author %>" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
@@ -201,4 +227,53 @@
 </div>
 
 <script src="//unpkg.com/alpinejs" defer></script>
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('novelDetailApp', () => ({
+            showEditInfo: false,
+            showCreateChapter: false,
+            showEditChapter: false,
+            editData: { id: '', title: '', order: '', content: '' },
+            
+            // [新增] Logo 上传逻辑
+            // 加上时间戳 v=... 是为了避免浏览器缓存旧图片，上传成功后会强制更新
+            logoUrl: '/images/<%= novel._id %>/logo.png?v=' + Date.now(),
+            isUploadingLogo: false,
+            
+            async uploadLogo(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                this.isUploadingLogo = true;
+                const reader = new FileReader();
+                
+                reader.onload = async (e) => {
+                    const base64 = e.target.result;
+                    try {
+                        const res = await fetch('/novel/<%= novel._id %>/upload_logo', { 
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ image: base64 })
+                        });
+                        const json = await res.json();
+                        
+                        if (json.success) {
+                            // 成功后更新 logoUrl，触发所有绑定该 URL 的 img 刷新
+                            this.logoUrl = json.path + '?v=' + Date.now();
+                        } else {
+                            alert('上传失败: ' + json.message);
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alert('网络错误');
+                    } finally {
+                        this.isUploadingLogo = false;
+                        event.target.value = ''; // 重置 input 以便能重复上传同一文件
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        }));
+    });
+</script>
 <%- include('partials/footer') %>

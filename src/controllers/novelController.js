@@ -621,3 +621,88 @@ export const generateAudio = async (ctx) => {
         ctx.body = { success: false, message: "生成失败: " + err.message };
     }
 };
+
+// 15. [新增] 上传页面图片 (Upload Page Image)
+// 保存路径: assets/outputs/images/novelId/ep章节数/x.png
+export const uploadPageImage = async (ctx) => {
+    const { id } = ctx.params;
+    const { image, filename } = ctx.request.body; // filename ex: "1.png"
+
+    if (!image || !filename) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: "参数缺失" };
+        return;
+    }
+
+    try {
+        const chapter = await Chapter.findById(id);
+        const novelIdStr = chapter.novelId.toString();
+        const epFolder = `ep${chapter.order}`; 
+        const targetDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr, epFolder);
+
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        // 去掉 base64 头部
+        const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+        const dataBuffer = Buffer.from(base64Data, 'base64');
+
+        const filePath = path.join(targetDir, filename);
+        fs.writeFileSync(filePath, dataBuffer);
+
+        ctx.body = { 
+            success: true, 
+            message: "图片上传成功", 
+            path: `/images/${novelIdStr}/${epFolder}/${filename}` 
+        };
+
+    } catch (err) {
+        console.error(err);
+        ctx.status = 500;
+        ctx.body = { success: false, message: "保存失败: " + err.message };
+    }
+};
+
+// 16. [新增] 上传小说 Logo
+// 保存路径: assets/outputs/images/novelId/logo.png
+export const uploadNovelLogo = async (ctx) => {
+    const { id } = ctx.params;
+    const { image } = ctx.request.body;
+
+    if (!image) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: "未接收到图片数据" };
+        return;
+    }
+
+    try {
+        const novelIdStr = id.toString();
+        // 目标目录: assets/outputs/images/novelId
+        const targetDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr);
+
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+        const dataBuffer = Buffer.from(base64Data, 'base64');
+
+        const filePath = path.join(targetDir, 'logo.png');
+        fs.writeFileSync(filePath, dataBuffer);
+
+        // 可选：更新小说封面的引用，如果 logo 也被视作封面
+        // await Novel.findByIdAndUpdate(id, { cover: `/images/${novelIdStr}/logo.png` });
+
+        ctx.body = { 
+            success: true, 
+            message: "Logo 上传成功", 
+            path: `/images/${novelIdStr}/logo.png` 
+        };
+
+    } catch (err) {
+        console.error(err);
+        ctx.status = 500;
+        ctx.body = { success: false, message: "保存失败: " + err.message };
+    }
+};
