@@ -351,26 +351,44 @@ export const splitImages = async (ctx) => {
         const epFolder = `ep${chapter.order}`; 
         
         // 路径配置
+        // baseDir: .../assets/outputs/images/novelId
         const baseDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr);
         const sourceDir = path.join(baseDir, epFolder); // 输入目录: .../epX
         const targetDir = path.join(sourceDir, 'ext');  // 输出目录: .../epX/ext
-        const logoPath = path.join(baseDir, 'logo.png'); // Logo路径: .../novelId/logo.png
+        const logoPath = path.join(baseDir, 'logo.png'); // Logo路径
+        
+        // 全局封尾路径 (小说根目录下 99.png)
+        const globalBackCover = path.join(baseDir, '99.png');
+        // 当前章节封尾路径
+        const localBackCover = path.join(sourceDir, '99.png');
 
         // 1. 检查源目录
         if (!fs.existsSync(sourceDir)) {
             throw new Error("图片目录不存在，请先在分镜页面上传图片");
         }
 
-        // 2. 准备输出目录 (清空旧数据)
+        // 2. [新增] 自动补全封尾逻辑
+        // 如果当前章节没有 99.png，但小说根目录有，则复制一份过来
+        if (!fs.existsSync(localBackCover) && fs.existsSync(globalBackCover)) {
+            try {
+                fs.copyFileSync(globalBackCover, localBackCover);
+                console.log(`[Auto Copy] 已将全局封尾复制到章节目录: ${localBackCover}`);
+            } catch (err) {
+                console.warn("自动复制封尾失败:", err.message);
+            }
+        }
+
+        // 3. 准备输出目录 (清空旧数据)
         if (fs.existsSync(targetDir)) {
             fs.rmSync(targetDir, { recursive: true, force: true });
         }
         fs.mkdirSync(targetDir, { recursive: true });
 
-        // 3. 读取所有待处理图片 (排除 style.png, logo.png 和文件夹)
+        // 4. 读取所有待处理图片 (排除 style.png, logo.png 和文件夹)
+        // 注意：因为刚才可能复制了 99.png，这里 readdirSync 会自动包含它
         const files = fs.readdirSync(sourceDir).filter(file => {
             const filePath = path.join(sourceDir, file);
-            if (fs.statSync(filePath).isDirectory()) return false; // 排除 ext 文件夹本身
+            if (fs.statSync(filePath).isDirectory()) return false; 
             
             const lower = file.toLowerCase();
             return (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg')) 
@@ -382,7 +400,7 @@ export const splitImages = async (ctx) => {
             throw new Error("当前目录下没有可处理的图片文件");
         }
 
-        // 4. 获取 Logo 信息 (如果存在)
+        // 5. 获取 Logo 信息 (如果存在)
         let logoMetadata = null;
         let hasLogo = false;
         if (fs.existsSync(logoPath)) {
@@ -394,10 +412,10 @@ export const splitImages = async (ctx) => {
             }
         }
 
-        // 5. 批量处理
+        // 6. 批量处理
         let processedCount = 0;
         
-        // 自然排序文件名 (1.png, 2.png, ... 10.png)
+        // 自然排序文件名 (1.png ... 99.png)
         files.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
         await Promise.all(files.map(async (file) => {
@@ -411,7 +429,7 @@ export const splitImages = async (ctx) => {
                 // 步骤 A: 缩放底图 (固定宽度 1600)
                 const resizeChain = sharp(inputPath).resize({ width: 1600 });
                 
-                // 如果需要合成 Logo，必须先获取缩放后的 Buffer 和 信息
+                // 如果需要合成 Logo
                 if (hasLogo && logoMetadata) {
                     const { data: bufferA, info: infoA } = await resizeChain.toBuffer({ resolveWithObject: true });
 
@@ -438,13 +456,12 @@ export const splitImages = async (ctx) => {
                 processedCount++;
             } catch (imgErr) {
                 console.error(`处理图片 ${fileName} 失败:`, imgErr);
-                // 不中断整体流程，继续下一张
             }
         }));
 
         const msg = hasLogo 
-            ? `处理完成！已合成水印，共导出 ${processedCount} 张图片。` 
-            : `处理完成！未找到 Logo，仅执行缩放导出，共 ${processedCount} 张。`;
+            ? `处理完成！${files.includes('99.png') ? '(含封尾) ' : ''}已合成水印，共导出 ${processedCount} 张图片。` 
+            : `处理完成！未找到 Logo，仅缩放导出，共 ${processedCount} 张。`;
 
         ctx.body = { success: true, message: msg };
 
