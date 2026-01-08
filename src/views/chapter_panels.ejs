@@ -73,9 +73,44 @@
                     </div>
 
                     <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                        <div x-show="panels.length === 0" class="h-full flex flex-col items-center justify-center text-slate-400">
-                            <div class="text-4xl mb-2 opacity-30">📭</div>
-                            <p class="text-sm">请在左侧解析 JSON 数据</p>
+                        
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden mb-6 group hover:border-indigo-400 transition-all">
+                            <div class="px-4 py-3 border-b border-slate-100 bg-indigo-50/30 flex justify-between items-center">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-lg">👤</span>
+                                    <span class="text-sm font-bold text-slate-700">角色参考图 (Characters)</span>
+                                </div>
+                                <label class="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 text-xs rounded hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-colors shadow-sm cursor-pointer group/upload relative overflow-hidden"
+                                       :class="{'!bg-green-50 !text-green-600 !border-green-200': charUploadStatus === 'success', '!bg-red-50 !text-red-600': charUploadStatus === 'error', 'pointer-events-none opacity-80': charUploadStatus === 'uploading'}">
+                                     <span x-show="charUploadStatus === 'idle' || charUploadStatus === 'uploading'" class="group-hover/upload:text-white flex items-center gap-1">
+                                         <span x-show="charUploadStatus === 'uploading'" class="animate-spin">⏳</span>
+                                         <span x-show="charUploadStatus !== 'uploading'">📤</span>
+                                         <span>上传角色 (支持多选)</span>
+                                     </span>
+                                     <span x-show="charUploadStatus === 'success'">✅ 上传成功</span>
+                                     <span x-show="charUploadStatus === 'error'">❌ 失败</span>
+                                     <input type="file" class="hidden" accept="image/*" multiple @change="uploadCharacters($event)">
+                                </label>
+                            </div>
+                            
+                            <div class="p-4 bg-slate-50/50">
+                                <div x-show="characters.length === 0" class="text-center py-6 text-slate-400 text-xs border-2 border-dashed border-slate-200 rounded-lg">
+                                    暂无角色图，请点击右上角上传
+                                </div>
+                                <div class="grid grid-cols-4 sm:grid-cols-5 gap-3" x-show="characters.length > 0">
+                                    <template x-for="char in characters" :key="char.name">
+                                        <div class="group/char relative aspect-square bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden cursor-pointer" @click="openPreview(char.url)">
+                                            <img :src="char.url" class="w-full h-full object-cover group-hover/char:scale-110 transition-transform duration-500">
+                                            <div class="absolute inset-0 bg-black/0 group-hover/char:bg-black/10 transition-colors"></div>
+                                            <div class="absolute bottom-0 inset-x-0 bg-black/60 backdrop-blur-sm px-1 py-1 text-[10px] text-white text-center truncate" x-text="char.name"></div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                        <div x-show="panels.length === 0" class="h-40 flex flex-col items-center justify-center text-slate-400">
+                            <div class="text-2xl mb-2 opacity-30">📭</div>
+                            <p class="text-sm">请在左侧解析 JSON 数据以生成分镜页</p>
                         </div>
                         
                         <template x-for="(panel, index) in panels" :key="index">
@@ -118,7 +153,6 @@
                                 <span class="text-lg">📚</span>
                                 <span class="text-sm font-bold text-slate-700">书籍装帧 (封面/封底)</span>
                             </div>
-                            
                             <div class="flex flex-col divide-y divide-slate-100">
                                 <div x-data="panelRow(0)" class="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors group">
                                      <img :src="imageUrl" @load="hasImage=true" @error="hasImage=false" class="hidden">
@@ -146,7 +180,6 @@
                                          </label>
                                      </div>
                                 </div>
-
                                 <div x-data="panelRow(99)" class="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors group">
                                      <img :src="imageUrl" @load="hasImage=true" @error="hasImage=false" class="hidden">
                                      <div class="flex items-center gap-3">
@@ -186,13 +219,13 @@
 <script src="//unpkg.com/alpinejs" defer></script>
 <script>
     document.addEventListener('alpine:init', () => {
+        // 单个页面的管理逻辑
         Alpine.data('panelRow', (pageNum) => ({
             hasImage: false,
             timestamp: Date.now(),
             uploadStatus: 'idle',
 
             get imageUrl() {
-                // 自动适配 0.png, 1.png ... 99.png
                 return `/images/${window.CHAPTER_DATA.novelId}/ep${window.CHAPTER_DATA.chapterOrder}/${pageNum}.png?v=${this.timestamp}`;
             },
 
@@ -201,7 +234,6 @@
                 if (!file) return;
 
                 this.uploadStatus = 'uploading';
-                
                 const reader = new FileReader();
                 reader.onload = async (e) => {
                     const base64 = e.target.result;
@@ -215,7 +247,6 @@
                             })
                         });
                         const json = await res.json();
-                        
                         if (json.success) {
                             this.uploadStatus = 'success';
                             this.timestamp = Date.now(); 
@@ -237,13 +268,74 @@
             }
         }));
 
+        // 全局 App 逻辑
         Alpine.data('panelsApp', () => ({
             panels: window.CHAPTER_DATA.panels,
             rawScript: localStorage.getItem(`aimanga_script_cache_${window.CHAPTER_DATA.chapterId}`) || '',
             isSubmitting: false,
             errorMsg: '',
-            
             previewUrl: null,
+            
+            // 角色相关状态
+            characters: [],
+            charUploadStatus: 'idle',
+
+            init() {
+                this.fetchCharacters();
+            },
+
+            async fetchCharacters() {
+                try {
+                    const res = await fetch(`/chapter/${window.CHAPTER_DATA.chapterId}/characters`);
+                    const json = await res.json();
+                    if (json.success) {
+                        this.characters = json.data;
+                    }
+                } catch(e) { console.error('Failed to fetch characters', e); }
+            },
+
+            // 批量上传角色
+            async uploadCharacters(event) {
+                const files = event.target.files;
+                if (!files || files.length === 0) return;
+
+                this.charUploadStatus = 'uploading';
+                
+                // 逐个上传
+                for (let i = 0; i < files.length; i++) {
+                    await this.uploadSingleChar(files[i]);
+                }
+
+                this.charUploadStatus = 'success';
+                this.fetchCharacters(); // 刷新列表
+                
+                setTimeout(() => {
+                    this.charUploadStatus = 'idle';
+                    event.target.value = '';
+                }, 2000);
+            },
+
+            async uploadSingleChar(file) {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const base64 = e.target.result;
+                        try {
+                            await fetch(`/chapter/${window.CHAPTER_DATA.chapterId}/upload_character`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    image: base64, 
+                                    filename: file.name
+                                })
+                            });
+                        } catch (err) { console.error(err); }
+                        resolve();
+                    };
+                    reader.readAsDataURL(file);
+                });
+            },
+
             openPreview(url) { this.previewUrl = url; },
             closePreview() { this.previewUrl = null; },
 

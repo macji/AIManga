@@ -737,3 +737,87 @@ export const uploadNovelLogo = async (ctx) => {
         ctx.body = { success: false, message: "保存失败: " + err.message };
     }
 };
+
+// 17. [新增] 上传角色参考图 (Upload Character Reference)
+// 保存路径: assets/outputs/images/novelId/ep章节数/characters/原文件名.jpg
+export const uploadCharacter = async (ctx) => {
+    const { id } = ctx.params;
+    const { image, filename } = ctx.request.body; // filename ex: "hero.png"
+
+    if (!image || !filename) {
+        ctx.status = 400;
+        ctx.body = { success: false, message: "参数缺失" };
+        return;
+    }
+
+    try {
+        const chapter = await Chapter.findById(id);
+        const novelIdStr = chapter.novelId.toString();
+        const epFolder = `ep${chapter.order}`; 
+        
+        // 目标目录: .../epX/characters/
+        const targetDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr, epFolder, 'characters');
+
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+        const dataBuffer = Buffer.from(base64Data, 'base64');
+
+        // 保留原始文件名，强制后缀为 .jpg
+        const originalName = path.parse(filename).name; // "hero"
+        const finalFileName = `${originalName}.jpg`;
+        const filePath = path.join(targetDir, finalFileName);
+
+        // 使用 sharp 转换格式并保存 (Quality 100)
+        await sharp(dataBuffer)
+            .jpeg({ quality: 100 }) 
+            .toFile(filePath);
+
+        ctx.body = { 
+            success: true, 
+            message: "角色图上传成功", 
+            // 返回相对路径供前端展示
+            path: `/images/${novelIdStr}/${epFolder}/characters/${finalFileName}` 
+        };
+
+    } catch (err) {
+        console.error(err);
+        ctx.status = 500;
+        ctx.body = { success: false, message: "保存失败: " + err.message };
+    }
+};
+
+// 18. [新增] 获取角色图列表
+export const getCharacters = async (ctx) => {
+    const { id } = ctx.params;
+    try {
+        const chapter = await Chapter.findById(id);
+        const novelIdStr = chapter.novelId.toString();
+        const epFolder = `ep${chapter.order}`;
+        const targetDir = path.join(process.cwd(), 'assets', 'outputs', 'images', novelIdStr, epFolder, 'characters');
+
+        if (!fs.existsSync(targetDir)) {
+            ctx.body = { success: true, data: [] };
+            return;
+        }
+
+        const files = fs.readdirSync(targetDir).filter(file => {
+            const ext = path.extname(file).toLowerCase();
+            return ['.jpg', '.jpeg', '.png'].includes(ext);
+        });
+
+        // 生成前端可用的 URL 列表
+        const characters = files.map(file => ({
+            name: file,
+            url: `/images/${novelIdStr}/${epFolder}/characters/${file}`
+        }));
+
+        ctx.body = { success: true, data: characters };
+    } catch (err) {
+        console.error(err);
+        ctx.status = 500;
+        ctx.body = { success: false, message: "获取列表失败" };
+    }
+};

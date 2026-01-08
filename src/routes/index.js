@@ -38,5 +38,7 @@ router.post('/novel/:id/upload_logo', novelController.uploadNovelLogo);
 
 // [新增] 上传页面图片
 router.post('/chapter/:id/upload_page_image', novelController.uploadPageImage); 
+router.post('/chapter/:id/upload_character', novelController.uploadCharacter);
+router.get('/chapter/:id/characters', novelController.getCharacters);
 
 export default router;
