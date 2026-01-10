@@ -25,7 +25,7 @@ export const createNovel = async (ctx) => {
 export const renderNovelDetail = async (ctx) => {
     const { id } = ctx.params;
     const novel = await Novel.findById(id);
-    const chapters = await Chapter.find({ novelId: id }).sort({ order: 1 });
+    const chapters = await Chapter.find({ novelId: id }).sort({ order: -1 });
     
     await ctx.render('novel_detail', { 
         title: novel.title, 
