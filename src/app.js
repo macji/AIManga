@@ -31,6 +31,9 @@ app.use(bodyParser());
 
 // [新增] 挂载生成的图片目录，访问路径为 /outputs/images/xxx.png
 app.use(serve(path.join(__dirname, '../assets/outputs')));
+// 注意：koa-static 本身不支持 mount prefix，通常用 koa-mount。
+// 如果没有 koa-mount，我们可以直接 serve assets 根目录
+app.use(serve(path.join(__dirname, '../assets')));
 
 // 配置 EJS 模板引擎
 app.use(views(path.join(__dirname, 'views'), {

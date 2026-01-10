@@ -6,8 +6,11 @@ const ChapterSchema = new mongoose.Schema({
     content: { type: String, required: true },
     order: { type: Number, default: 0 },
     
-    // [新增] 用于存储用户输入的视觉设定草稿
+    // 用于存储用户输入的视觉设定草稿
     visual_setting_text: { type: String, default: "" },
+
+    // [新增] 作品总结/摘要
+    summary: { type: String, default: "" },
 
     script_data: [{
         id: String,

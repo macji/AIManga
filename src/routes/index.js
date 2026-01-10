@@ -1,5 +1,6 @@
 import Router from 'koa-router';
 import * as novelController from '../controllers/novelController.js';
+import * as videoController from '../controllers/videoController.js';
 
 const router = new Router();
 
@@ -21,6 +22,7 @@ router.post('/chapter/:id/delete', novelController.deleteChapter);
 router.get('/chapter/:id', novelController.redirectChapterDetail); // 默认跳转
 router.get('/chapter/:id/script', novelController.renderChapterPage);  // 提示词生成
 router.get('/chapter/:id/setting', novelController.renderChapterPage); // 视觉设定
+router.get('/chapter/:id/summary', novelController.renderChapterPage);
 router.get('/chapter/:id/panels', novelController.renderChapterPage);  // 分镜制作
 router.get('/chapter/:id/split', novelController.renderChapterPage);   // 图片分割
 router.get('/chapter/:id/audio', novelController.renderChapterPage);   // 语音字幕
@@ -36,9 +38,24 @@ router.post('/chapter/:id/generate_audio', novelController.generateAudio);
 // [新增] 小说 Logo 上传
 router.post('/novel/:id/upload_logo', novelController.uploadNovelLogo);
 
+// 保存总结接口
+router.post('/chapter/:id/save_summary', novelController.saveChapterSummary);
+router.get('/chapter/:id/summary', novelController.getChapterSummary);
+
 // [新增] 上传页面图片
 router.post('/chapter/:id/upload_page_image', novelController.uploadPageImage); 
 router.post('/chapter/:id/upload_character', novelController.uploadCharacter);
 router.get('/chapter/:id/characters', novelController.getCharacters);
+
+router.get('/video', videoController.renderEditor);
+router.post('/video/upload', videoController.uploadVideo);
+router.post('/video/merge', videoController.mergeVideos);
+
+// [新增] 删除接口
+router.post('/video/delete', videoController.deleteVideo);
+router.post('/video/clear', videoController.clearAllVideos);
+
+// [新增] 清理视频路由
+router.post('/video/clean', videoController.cleanVideo);
 
 export default router;

@@ -16,6 +16,8 @@
     <nav class="flex-1 py-4 space-y-1 overflow-y-auto custom-scrollbar">
         <% const tabs = [
             { id: 'script', icon: '📝', label: '提示词生成' },
+            // [新增] 章节总结 Tab
+            { id: 'summary', icon: '📑', label: '章节总结' }, 
             { id: 'setting', icon: '🎨', label: '视觉设定' },
             { id: 'panels', icon: '🎬', label: '分镜制作', badge: chapter.script_data ? chapter.script_data.length : 0 },
             { id: 'split', icon: '✂️', label: '图片分割' },

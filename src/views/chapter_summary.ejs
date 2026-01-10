@@ -1,0 +1,83 @@
+<%- include('partials/header') %>
+
+<script>
+    window.CHAPTER_DATA = {
+        novelId: "<%= novel._id %>",
+        chapterId: "<%= chapter._id %>",
+        summary: <%- JSON.stringify(chapter.summary || "") %>
+    };
+</script>
+
+<div class="flex h-[calc(100vh-64px)] overflow-hidden bg-slate-50" x-data="summaryApp()">
+    
+    <%- include('partials/chapter_sidebar') %>
+
+    <div class="flex-1 flex flex-col min-w-0 bg-white relative">
+        <div class="px-8 py-4 border-b border-slate-100 flex justify-between items-center bg-white flex-shrink-0 h-16">
+            <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                <span>📝</span> <span>章节总结</span>
+            </h2>
+            <div class="flex items-center gap-4">
+                 <span x-show="isSaving" class="text-xs text-orange-500 bg-orange-50 px-2 py-1 rounded animate-pulse" style="display: none;">正在保存...</span>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-hidden relative bg-slate-50/30">
+            <div class="absolute inset-0 p-6 grid grid-cols-2 gap-6 overflow-hidden">
+                
+                <div class="flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 h-full overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center flex-shrink-0">
+                        <span class="text-sm font-bold text-slate-700">📜 小说原文</span>
+                    </div>
+                    <textarea class="flex-1 w-full p-4 resize-none outline-none text-sm text-slate-700 font-mono bg-white leading-relaxed custom-scrollbar" readonly><%= chapter.content %></textarea>
+                </div>
+
+                <div class="flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 h-full overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 bg-orange-50/50 flex justify-between items-center flex-shrink-0">
+                        <span class="text-sm font-bold text-orange-900">📝 撰写总结</span>
+                        <button @click="saveSummary()" class="px-4 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 transition shadow-sm flex items-center gap-1">
+                            <span x-show="!isSaving">💾 保存总结</span>
+                            <span x-show="isSaving">保存中...</span>
+                        </button>
+                    </div>
+                    <textarea 
+                        x-model="summaryText" 
+                        class="flex-1 w-full p-5 resize-none outline-none text-sm text-slate-700 font-mono bg-white leading-relaxed placeholder-slate-300 custom-scrollbar" 
+                        placeholder="在此输入本章节的核心情节、人物发展或情感基调总结...&#10;这些总结将有助于 AI 更好地理解上下文。"></textarea>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="//unpkg.com/alpinejs" defer></script>
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('summaryApp', () => ({
+            summaryText: window.CHAPTER_DATA.summary,
+            isSaving: false,
+
+            saveSummary() {
+                this.isSaving = true;
+                fetch(`/chapter/${window.CHAPTER_DATA.chapterId}/save_summary`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ summary: this.summaryText })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        // 可以选择添加一个 Toast 提示，或者简单的 Log
+                        console.log('保存成功');
+                    } else {
+                        alert('保存失败: ' + data.message);
+                    }
+                })
+                .catch(() => alert('网络错误'))
+                .finally(() => this.isSaving = false);
+            }
+        }));
+    });
+</script>
+<%- include('partials/footer') %>

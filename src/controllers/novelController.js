@@ -108,11 +108,9 @@ export const redirectChapterDetail = async (ctx) => {
     ctx.redirect(`/chapter/${id}/script`);
 };
 
-// [重构] 8.1 渲染章节具体 Tab 页面
 export const renderChapterPage = async (ctx) => {
     const { id } = ctx.params;
     
-    // 从 URL 路径获取当前 Tab
     const pathParts = ctx.path.split('/');
     const currentTab = pathParts[pathParts.length - 1]; 
 
@@ -125,6 +123,7 @@ export const renderChapterPage = async (ctx) => {
     const viewMap = {
         'script': 'chapter_script',
         'setting': 'chapter_setting',
+        'summary': 'chapter_summary', // [新增]
         'panels': 'chapter_panels',
         'split': 'chapter_split',
         'audio': 'chapter_audio',
@@ -134,19 +133,36 @@ export const renderChapterPage = async (ctx) => {
     const tabNameMap = {
         'script': '提示词生成',
         'setting': '视觉设定',
+        'summary': '作品总结', // [新增]
         'panels': '分镜制作',
         'split': '图片分割',
         'audio': '语音字幕',
         'video': '视频生成'
     };
 
-    // 渲染对应的独立模板
     await ctx.render(viewMap[currentTab] || 'chapter_script', { 
         title: `${chapter.title} - ${tabNameMap[currentTab] || '制作'}`, 
         chapter, 
         novel,
         activeTab: currentTab
     });
+};
+
+// [新增] 保存作品总结文本
+export const saveChapterSummary = async (ctx) => {
+    const { id } = ctx.params;
+    const { summary } = ctx.request.body;
+
+    try {
+        await Chapter.findByIdAndUpdate(id, {
+            summary: summary
+        });
+        ctx.body = { success: true, message: "总结保存成功" };
+    } catch (err) {
+        console.error(err);
+        ctx.status = 500;
+        ctx.body = { success: false, message: "保存失败: " + err.message };
+    }
 };
 
 // 9. 导入脚本
@@ -786,6 +802,26 @@ export const uploadCharacter = async (ctx) => {
         console.error(err);
         ctx.status = 500;
         ctx.body = { success: false, message: "保存失败: " + err.message };
+    }
+};
+
+export const getChapterSummary = async (ctx) => {
+    const { id } = ctx.params;
+    try {
+        const chapter = await Chapter.findById(id);
+        if (!chapter) throw new Error('章节不存在');
+        
+        const novel = await Novel.findById(chapter.novelId);
+        
+        await ctx.render('chapter_summary', {
+            title: `${chapter.title} - 章节总结`,
+            chapter,
+            novel,
+            activeTab: 'summary' // 激活侧边栏对应项
+        });
+    } catch (err) {
+        console.error(err);
+        ctx.redirect('/');
     }
 };
 

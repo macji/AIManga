@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频拼接工具 - 独立版</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .card {
+            transition: all 0.2s;
+            border: 1px solid #e0e0e0;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+        }
+        .btn-circle {
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card-bgm {
+            border-color: #ffc107;
+            background-color: #fffbf0;
+        }
+        .card-bgm .badge {
+            background-color: #ffc107 !important;
+            color: #000;
+        }
+        .toast-container {
+            z-index: 1060;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-fluid" style="max-width: 1400px; padding: 30px; padding-bottom: 100px;">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-film"></i> 视频拼接工具</h2>
+            <div>
+                <button class="btn btn-outline-danger btn-sm me-2" onclick="clearAll()">
+                    <i class="bi bi-trash"></i> 一键清空
+                </button>
+                <a href="/" class="btn btn-outline-secondary btn-sm">返回首页</a>
+            </div>
+        </div>
+        
+        <div class="row" id="cardContainer">
+            
+            <div class="col-6 col-sm-4 col-md-3 col-lg-2 mb-4">
+                <div class="card h-100 shadow-sm card-bgm">
+                    <div class="card-header d-flex justify-content-between align-items-center py-2">
+                        <span class="badge rounded-pill"><i class="bi bi-music-note-beamed"></i> BGM</span>
+                        
+                        <div class="d-flex gap-1">
+                            <% const bgmExists = existingFiles && existingFiles.includes('bgm.mp3'); %>
+                            
+                            <button id="btn-del-0" class="btn btn-sm btn-outline-danger btn-circle" 
+                                    style="display: <%= bgmExists ? 'flex' : 'none' %>"
+                                    title="删除" onclick="deleteVideo(0)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+
+                            <button class="btn btn-sm btn-warning btn-circle text-white" title="上传背景音乐(mp3)" onclick="triggerUpload(0)">
+                                <i class="bi bi-upload"></i>
+                            </button>
+                        </div>
+                        <input type="file" id="file-0" accept="audio/*" style="display:none" onchange="handleFileSelect(this, 0)">
+                    </div>
+                    
+                    <div class="card-body p-0 d-flex flex-column justify-content-center align-items-center" style="height: 140px; position: relative;">
+                        <div id="preview-area-0" style="display: <%= bgmExists ? 'block' : 'none' %>; text-align: center;">
+                            <i class="bi bi-play-circle-fill text-warning" style="font-size: 3.5rem; cursor: pointer;" 
+                               onclick="playVideo(0)"></i>
+                            <div class="mt-1 badge bg-warning bg-opacity-10 text-dark border border-warning">已上传</div>
+                        </div>
+                        <div id="loading-0" style="display: none; text-align: center;">
+                            <div class="spinner-border text-warning" role="status"></div>
+                            <div style="font-size: 12px; margin-top: 5px; color: #666;">上传中...</div>
+                        </div>
+                        <div id="placeholder-0" style="display: <%= bgmExists ? 'none' : 'block' %>; color: #e0c080;">
+                            <i class="bi bi-music-note" style="font-size: 2.5rem;"></i>
+                            <div style="font-size: 12px;">背景音乐</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <% for(let i=1; i<=30; i++) { %>
+                <div class="col-6 col-sm-4 col-md-3 col-lg-2 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+                            <span class="badge bg-secondary rounded-pill">#<%= i %></span>
+                            
+                            <div class="d-flex gap-1">
+                                <% 
+                                   const fileName = i + '.mp4';
+                                   const exists = existingFiles && existingFiles.includes(fileName);
+                                %>
+                                
+                                <button id="btn-clean-<%= i %>" class="btn btn-sm btn-outline-info btn-circle"
+                                        style="display: <%= exists ? 'flex' : 'none' %>"
+                                        title="清理 (切除前0.1s)" onclick="cleanVideo(<%= i %>)">
+                                    <i class="bi bi-scissors"></i>
+                                </button>
+
+                                <button id="btn-del-<%= i %>" class="btn btn-sm btn-outline-danger btn-circle"
+                                        style="display: <%= exists ? 'flex' : 'none' %>"
+                                        title="删除" onclick="deleteVideo(<%= i %>)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+
+                                <button class="btn btn-sm btn-primary btn-circle" title="上传视频" onclick="triggerUpload(<%= i %>)">
+                                    <i class="bi bi-upload"></i>
+                                </button>
+                            </div>
+                            <input type="file" id="file-<%= i %>" accept="video/*" style="display:none" onchange="handleFileSelect(this, <%= i %>)">
+                        </div>
+                        
+                        <div class="card-body p-0 d-flex flex-column justify-content-center align-items-center bg-light" style="height: 140px; position: relative;">
+                            <div id="preview-area-<%= i %>" style="display: <%= exists ? 'block' : 'none' %>; text-align: center;">
+                                <i class="bi bi-file-earmark-play-fill text-success" style="font-size: 3.5rem; cursor: pointer; transition: 0.2s;" 
+                                   onmouseover="this.style.transform='scale(1.1)'" 
+                                   onmouseout="this.style.transform='scale(1)'"
+                                   onclick="playVideo('<%= i %>')"></i>
+                                <div class="mt-1 badge bg-success bg-opacity-10 text-success border border-success">已生成</div>
+                            </div>
+                            <div id="loading-<%= i %>" style="display: none; text-align: center;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <div style="font-size: 12px; margin-top: 5px; color: #666;">处理中...</div>
+                            </div>
+                            <div id="placeholder-<%= i %>" style="display: <%= exists ? 'none' : 'block' %>; color: #dee2e6;">
+                                <i class="bi bi-camera-video" style="font-size: 2.5rem;"></i>
+                                <div style="font-size: 12px;">空</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="fixed-bottom bg-white border-top py-3 text-center shadow-lg" style="z-index: 1030;">
+        <div class="container">
+            <button id="btnMerge" class="btn btn-success btn-lg px-5 rounded-pill fw-bold" onclick="mergeVideos()">
+                <i class="bi bi-collection-play me-2"></i> 合成 output.mp4
+            </button>
+            <button id="btnPreviewOutput" class="btn btn-outline-primary btn-lg ms-3 rounded-pill" style="display:none" onclick="playVideo('output')">
+                <i class="bi bi-play-circle me-2"></i> 预览合成视频
+            </button>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="liveToast" class="toast align-items-center text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toastBody"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="mediaModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content bg-dark">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-white" id="mediaModalLabel">预览</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 d-flex justify-content-center bg-black align-items-center" style="min-height: 200px;">
+                    <div id="mediaContainer" style="width: 100%; text-align: center;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        function showToast(message, type = 'success') {
+            const toastEl = document.getElementById('liveToast');
+            const toastBody = document.getElementById('toastBody');
+            toastBody.textContent = message;
+            toastEl.classList.remove('bg-success', 'bg-danger', 'bg-secondary', 'bg-info');
+            
+            if (type === 'success') toastEl.classList.add('bg-success');
+            else if (type === 'error') toastEl.classList.add('bg-danger');
+            else if (type === 'info') toastEl.classList.add('bg-info');
+            else toastEl.classList.add('bg-secondary');
+
+            const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+            toast.show();
+        }
+
+        // [新增] 清理视频功能
+        async function cleanVideo(index) {
+            const btn = document.getElementById(`btn-clean-${index}`);
+            // 简单防止重复点击
+            if (btn.disabled) return;
+            
+            if (!confirm(`确定要切除片段 #${index} 的前 0.1 秒吗？此操作将覆盖原视频。`)) return;
+
+            btn.disabled = true;
+            showToast('处理中...', 'info');
+
+            try {
+                const res = await fetch('/video/clean', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ index })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('清理成功！');
+                } else {
+                    showToast('失败: ' + data.message, 'error');
+                }
+            } catch (err) {
+                showToast('请求错误', 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // ... (其他 triggerUpload, handleFileSelect, deleteVideo, clearAll, playVideo, mergeVideos 等函数保持不变)
+        
+        function triggerUpload(index) { document.getElementById(`file-${index}`).click(); }
+
+        async function handleFileSelect(input, index) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                document.getElementById(`preview-area-${index}`).style.display = 'none';
+                document.getElementById(`placeholder-${index}`).style.display = 'none';
+                document.getElementById(`loading-${index}`).style.display = 'block';
+                if(document.getElementById(`btn-del-${index}`)) document.getElementById(`btn-del-${index}`).style.display = 'none';
+                if(document.getElementById(`btn-clean-${index}`)) document.getElementById(`btn-clean-${index}`).style.display = 'none';
+
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const base64Data = e.target.result;
+                    try {
+                        const res = await fetch('/video/upload', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ index: index, fileData: base64Data })
+                        });
+                        const data = await res.json();
+                        document.getElementById(`loading-${index}`).style.display = 'none';
+                        if (data.success) {
+                            document.getElementById(`preview-area-${index}`).style.display = 'block';
+                            if(document.getElementById(`btn-del-${index}`)) document.getElementById(`btn-del-${index}`).style.display = 'flex';
+                            if(document.getElementById(`btn-clean-${index}`)) document.getElementById(`btn-clean-${index}`).style.display = 'flex';
+                            showToast('上传成功');
+                        } else {
+                            showToast(data.message, 'error');
+                            document.getElementById(`placeholder-${index}`).style.display = 'block';
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        showToast('网络错误', 'error');
+                        document.getElementById(`loading-${index}`).style.display = 'none';
+                        document.getElementById(`placeholder-${index}`).style.display = 'block';
+                    }
+                };
+                reader.readAsDataURL(file);
+                input.value = '';
+            }
+        }
+
+        async function deleteVideo(index) {
+            if (!confirm('确定要删除这个片段吗？')) return;
+            try {
+                const res = await fetch('/video/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ index })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('删除成功');
+                    document.getElementById(`preview-area-${index}`).style.display = 'none';
+                    if(document.getElementById(`btn-del-${index}`)) document.getElementById(`btn-del-${index}`).style.display = 'none';
+                    if(document.getElementById(`btn-clean-${index}`)) document.getElementById(`btn-clean-${index}`).style.display = 'none';
+                    document.getElementById(`placeholder-${index}`).style.display = 'block';
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (err) { showToast('请求错误', 'error'); }
+        }
+
+        async function clearAll() {
+            if (!confirm('警告：确定要清空所有已上传的视频和音乐吗？此操作不可恢复。')) return;
+            try {
+                const res = await fetch('/video/clear', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('已清空');
+                    setTimeout(() => { window.location.reload(); }, 1000);
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (err) { showToast('请求错误', 'error'); }
+        }
+
+        function playVideo(index) {
+            const container = document.getElementById('mediaContainer');
+            const title = document.getElementById('mediaModalLabel');
+            const timestamp = new Date().getTime();
+            container.innerHTML = '';
+            if (index == 0) {
+                title.innerHTML = '<i class="bi bi-music-note-beamed me-2"></i>试听背景音乐';
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.style.width = "80%";
+                audio.src = `/video/bgm.mp3?t=${timestamp}`;
+                container.appendChild(audio);
+            } else if (index === 'output') {
+                title.innerHTML = '<i class="bi bi-film me-2"></i>预览合成视频';
+                const video = document.createElement('video');
+                video.controls = true;
+                video.style.maxWidth = "100%";
+                video.style.maxHeight = "80vh";
+                video.src = `/video/output.mp4?t=${timestamp}`;
+                container.appendChild(video);
+            } else {
+                title.innerHTML = `<i class="bi bi-film me-2"></i>预览片段 #${index}`;
+                const video = document.createElement('video');
+                video.controls = true;
+                video.style.maxWidth = "100%";
+                video.style.maxHeight = "80vh";
+                video.src = `/video/${index}.mp4?t=${timestamp}`;
+                container.appendChild(video);
+            }
+            const modalEl = document.getElementById('mediaModal');
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+            modalEl.addEventListener('hidden.bs.modal', function () { container.innerHTML = ''; }, { once: true });
+        }
+
+        async function mergeVideos() {
+            const btn = document.getElementById('btnMerge');
+            const btnPreview = document.getElementById('btnPreviewOutput');
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> 合成中...';
+            btnPreview.style.display = 'none';
+            try {
+                const res = await fetch('/video/merge', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('合成成功！');
+                    btnPreview.style.display = 'inline-flex';
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (err) { showToast('请求错误', 'error'); } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        }
+    </script>
+</body>
+</html>
